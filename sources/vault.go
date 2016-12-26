@@ -18,7 +18,7 @@ type VaultClient struct {
 	backend Client
 }
 
-// get a
+// getParameter get a k/v from parameters
 func getParameter(key string, parameters map[string]string) string {
 	value := parameters[key]
 	if value == "" {
