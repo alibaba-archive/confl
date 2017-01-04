@@ -10,10 +10,11 @@ Watch a distributed store and reload configurate.
 
 ## Getting Started
 
-```shell
-go get github.com/teambition/confl
-```
+### install
 
+```shell
+go get -u -v github.com/teambition/confl
+```
 
 #### from etcd and vault
 
