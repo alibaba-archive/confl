@@ -50,7 +50,7 @@ func main() {
 		return nil
 	}
 
-	// write {"username": "xushuai", "password": "VAULT: secret/password", "phone": "VAULT: secret/phone"} to etcd
+	// write {"username": "xushuai", "password": "VAULT: secret/password", "phone": "VAULT: secret/phone"} to key /teambition/auth-production
 
 	err = confl.LoadJSONAndWatch(context.Background(), c, "/teambition/auth-production", etcdClient, reload)
 	if err != nil {
