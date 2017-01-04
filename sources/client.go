@@ -3,22 +3,10 @@ package sources
 import (
 	"errors"
 
+	"github.com/teambition/confl/sources/common"
+	"github.com/teambition/confl/sources/etcd"
+	"github.com/teambition/confl/sources/vault"
 	"golang.org/x/net/context"
-)
-
-type Response struct {
-	Key       string
-	NextIndex uint64
-	Error     error
-}
-
-type Type int
-
-const (
-	None Type = iota
-	Etcd
-	Vault
-	Consul
 )
 
 // The Client interface needed impled by a k/v store like etcd, consul, redis etc.
@@ -38,11 +26,18 @@ type Client interface {
 			reload()
 		}
 	*/
-	Watch(ctx context.Context, key string) <-chan *Response
+	Watch(ctx context.Context, key string) <-chan *common.Response
 	Key(ctx context.Context, key string) (string, error)
-	WithClient(Client)
-	Type() Type
 }
+
+type Type int
+
+const (
+	None Type = iota
+	Consul
+	Etcd
+	Vault
+)
 
 // New is used to create a storage client based on our configuration.
 func New(config Config) (Client, error) {
@@ -56,7 +51,7 @@ func New(config Config) (Client, error) {
 	case Etcd:
 		// Create the etcd client upfront and use it for the life of the process.
 		// The etcdClient is an http.Client and designed to be reused.
-		return NewEtcdClient(hosts, config.ClientCert, config.ClientKey, config.ClientCaKeys, config.BasicAuth, config.Username, config.Password)
+		return etcd.NewClient(hosts, config.ClientCert, config.ClientKey, config.ClientCaKeys, config.BasicAuth, config.Username, config.Password)
 	case Vault:
 		vaultConfig := map[string]string{
 			"app-id":   config.AppID,
@@ -68,7 +63,7 @@ func New(config Config) (Client, error) {
 			"key":      config.ClientKey,
 			"caCert":   config.ClientCaKeys,
 		}
-		return NewVaultClient(hosts[0], config.AuthType, vaultConfig)
+		return vault.NewClient(hosts[0], config.AuthType, vaultConfig)
 	}
 	return nil, errors.New("Invalid sources")
 }
