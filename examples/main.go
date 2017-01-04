@@ -1,19 +1,13 @@
 package main
 
 import (
-	j "encoding/json"
+	"context"
 	"fmt"
-	"time"
 
+	"github.com/teambition/confl"
 	"github.com/teambition/confl/encoding/json"
 	"github.com/teambition/confl/sources"
 )
-
-type config struct {
-	Username string      `json:"username"`
-	Password *json.Vault `json:"password"`
-	Phone    *json.Vault `json:"phone"`
-}
 
 func main() {
 	etcdConfig := sources.Config{
@@ -38,26 +32,29 @@ func main() {
 		panic(err)
 	}
 
-	vaultClient.WithClient(etcdClient)
+	type config struct {
+		Username string      `json:"username"`
+		Password *json.Vault `json:"password"`
+		Phone    *json.Vault `json:"phone"`
+	}
+
+	c := &config{
+		Password: json.NewVault(vaultClient),
+		Phone:    json.NewVault(vaultClient),
+	}
 
 	reload := func() error {
-		fmt.Println("reloading")
+		fmt.Printf("%#v\n", c)
+		fmt.Printf("%#v\n", c.Password.Value())
+		fmt.Printf("%#v\n", c.Phone.Value())
 		return nil
 	}
 
-	v, err := json.NewVault("/vault", vaultClient, reload)
+	// write {"username": "xushuai", "password": "VAULT: secret/password", "phone": "VAULT: secret/phone"} to etcd
+
+	err = confl.LoadJSONAndWatch(context.Background(), c, "/teambition/auth-production", etcdClient, reload)
 	if err != nil {
 		panic(err)
 	}
 
-	c := &config{
-		Password: v,
-		Phone:    v.Copy(),
-	}
-
-	raw := `{"username": "xushuai", "password": "VAULT: secret/password", "phone": "VAULT: secret/phone"}`
-
-	j.Unmarshal([]byte(raw), c)
-	fmt.Printf("%#v\n", c.Password.Value())
-	time.Sleep(time.Hour)
 }
