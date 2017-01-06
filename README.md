@@ -1,5 +1,7 @@
 # confl
 
+[![Build Status](https://travis-ci.org/teambition/confl.svg?branch=master)](https://travis-ci.org/teambition/confl)
+
 Watch a distributed store and reload configurate.
 
 
