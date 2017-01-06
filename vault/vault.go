@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 
 	vaultapi "github.com/hashicorp/vault/api"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type Vault struct {
@@ -18,6 +19,15 @@ type Vault struct {
 
 func (v *Vault) Secret() *Secret {
 	return &Secret{vault: v}
+}
+
+func NewFromEnv() (*Vault, error) {
+	var cfg Config
+	err := envconfig.Process("", &cfg)
+	if err != nil {
+		return nil, err
+	}
+	return New(cfg)
 }
 
 func New(cfg Config) (*Vault, error) {

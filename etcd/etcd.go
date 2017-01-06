@@ -11,17 +11,16 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/client"
-	flags "github.com/jessevdk/go-flags"
-	"github.com/teambition/confl"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type Confl struct {
 	client client.KeysAPI
 }
 
-func NewConflFromEnv() (confl.Confl, error) {
+func NewConflFromEnv() (*Confl, error) {
 	var cfg Config
-	_, err := flags.Parse(&cfg)
+	err := envconfig.Process("", &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +28,7 @@ func NewConflFromEnv() (confl.Confl, error) {
 }
 
 // NewConfl return a *etcd.Client perhaps need auth or tls
-func NewConfl(cfg Config) (confl.Confl, error) {
+func NewConfl(cfg Config) (*Confl, error) {
 	var (
 		c    client.Client
 		kapi client.KeysAPI
