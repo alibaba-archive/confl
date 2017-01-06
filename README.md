@@ -18,7 +18,7 @@ Watch a distributed store and reload configurate.
 go get -u -v github.com/teambition/confl
 ```
 
-#### from etcd and vault
+#### usage
 
 ```go
 package main
