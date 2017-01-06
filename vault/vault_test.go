@@ -4,15 +4,21 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/hashicorp/vault/http"
+	"github.com/hashicorp/vault/vault"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestVault(t *testing.T) {
+	core, _, token := vault.TestCoreUnsealed(t)
+	ln, addr := http.TestServer(t, core)
+	defer ln.Close()
+
 	assert := assert.New(t)
 	cfg := Config{
 		AuthType: AuthToken,
-		Token:    "273e8292-e45d-7da1-2560-3118adbe01c0",
-		Address:  "http://localhost:8200",
+		Token:    token,
+		Address:  addr,
 	}
 	v, err := New(cfg)
 	assert.Nil(err)

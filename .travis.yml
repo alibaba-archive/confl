@@ -2,15 +2,13 @@ sudo: false
 language: go
 go:
   - 1.7
-  - tip
 before_install:
   - go get -t -v ./...
   - go get github.com/modocache/gover
   - go get github.com/mattn/goveralls
   - bash build_etcd.sh
-  - bash build_vault.sh
 script:
-  - go test -coverprofile=vault.coverprofile ./etcd
-  - go test -coverprofile=etcd.coverprofile ./vault
+  - go test -coverprofile=vault.coverprofile ./vault
+  - go test -coverprofile=etcd.coverprofile ./etcd
   - gover
   - goveralls -coverprofile=gover.coverprofile -service=travis-ci
