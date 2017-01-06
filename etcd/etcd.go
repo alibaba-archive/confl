@@ -138,6 +138,7 @@ func (c *Confl) get(ctx context.Context, key string) (*client.Response, error) {
 	return resp, nil
 }
 
+// LoadConfig get value from etcd backend by the given key
 func (c *Confl) LoadConfig(ctx context.Context, config interface{}, key string) error {
 	resp, err := c.get(ctx, key)
 	if err != nil {
@@ -146,6 +147,9 @@ func (c *Confl) LoadConfig(ctx context.Context, config interface{}, key string) 
 	return json.Unmarshal([]byte(resp.Node.Value), config)
 }
 
+// WatchConfig initialize the config from etcd with given key firstly
+// Then watch the changes of the key and reassign config
+// Call reload when success
 func (c *Confl) WatchConfig(ctx context.Context, config interface{}, key string, reload func() error) <-chan error {
 	respChan := make(chan *client.Response)
 	errChan := make(chan error)

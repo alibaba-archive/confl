@@ -16,10 +16,12 @@ type Vault struct {
 	*vaultapi.Client
 }
 
+// Secret return secret object for config struct
 func (v *Vault) Secret() *Secret {
 	return &Secret{vault: v}
 }
 
+// NewFromEnv initialize the Vault with environment variables
 func NewFromEnv() (*Vault, error) {
 	var cfg Config
 	err := envconfig.Process("", &cfg)
@@ -70,6 +72,7 @@ func New(cfg Config) (*Vault, error) {
 	// auth typep
 	var secret *vaultapi.Secret
 
+	// check the auth type and authenticate the vault service
 	switch cfg.AuthType {
 	case AuthAppID:
 		secret, err = client.Logical().Write("/auth/app-id/login", map[string]interface{}{

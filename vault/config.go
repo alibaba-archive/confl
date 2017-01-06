@@ -10,14 +10,19 @@ const (
 	AuthPass   AuthType = "userpass"
 )
 
+// use https://github.com/kelseyhightower/envconfig to parse the environment variables for config
+// it's container-friendly like docker, rocket
 type Config struct {
 	AuthType AuthType `envconfig:"CONFL_VAULT_AUTH_TYPE" required:"true"`
 	Address  string   `envconfig:"CONFL_VAULT_ADDRESS" required:"true"`
-	AppID    string   `envconfig:"CONFL_VAULT_APP_ID"`
-	UserID   string   `envconfig:"CONFL_VAULT_USER_ID"`
-	Username string   `envconfig:"CONFL_VAULT_USERNAME"`
-	Password string   `envconfig:"CONFL_VAULT_PASSWORD"`
-	Token    string   `envconfig:"CONFL_VAULT_TOKEN"`
+	// "app id auth backend"(See https://www.vaultproject.io/docs/auth/app-id.html)
+	AppID  string `envconfig:"CONFL_VAULT_APP_ID"`
+	UserID string `envconfig:"CONFL_VAULT_USER_ID"`
+	// "userpass auth backend"(see https://www.vaultproject.io/docs/auth/userpass.html)
+	Username string `envconfig:"CONFL_VAULT_USERNAME"`
+	Password string `envconfig:"CONFL_VAULT_PASSWORD"`
+	// (See https://www.vaultproject.io/docs/auth/token.html)
+	Token string `envconfig:"CONFL_VAULT_TOKEN"`
 	// x509 key pairs
 	Cert string `envconfig:"CONFL_VAULT_CERT"`
 	Key  string `envconfig:"CONFL_VAULT_KEY"`
