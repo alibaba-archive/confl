@@ -2,12 +2,11 @@ package vault
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-
-	"crypto/x509"
 
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/kelseyhightower/envconfig"
