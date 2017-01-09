@@ -27,6 +27,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/teambition/confl"
 	"github.com/teambition/confl/etcd"
 	"github.com/teambition/confl/vault"
 )
@@ -36,7 +37,9 @@ func main() {
 		Clusters: []string{"http://localhost:2379"},
 	}
 
-	confl, err := etcd.NewConfl(etcdConfig)
+	etcdConfig.ConfPath = "/teambition/auth-production"
+
+	cl, err := etcd.NewClient(etcdConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -72,10 +75,13 @@ func main() {
 	// write to etcd
 	_ = `{"username": "xushuai", "password": "VAULT(secret/password)", "phone": "VAULT(secret/phone)"}`
 
-	key := "/teambition/auth-production"
+	errChan := make(chan error)
+	go func() {
+		err := cl.WatchConfig(context.Background(), c, confl.ReloadFunc(reload), errChan)
+		_ = err
+	}()
 
-	for err := range confl.WatchConfig(context.Background(), c, key, reload) {
-		fmt.Println(err)
+	for range errChan {
 	}
 }
 ```

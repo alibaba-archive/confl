@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/teambition/confl"
 	"github.com/teambition/confl/etcd"
 	"github.com/teambition/confl/vault"
 )
@@ -15,7 +16,7 @@ func main() {
 
 	etcdConfig.ConfPath = "/teambition/auth-production"
 
-	confl, err := etcd.NewConfl(etcdConfig)
+	cl, err := etcd.NewClient(etcdConfig)
 	if err != nil {
 		panic(err)
 	}
@@ -51,7 +52,12 @@ func main() {
 	// write to etcd
 	_ = `{"username": "xushuai", "password": "VAULT(secret/password)", "phone": "VAULT(secret/phone)"}`
 
-	for err := range confl.WatchConfig(context.Background(), c, reload) {
-		fmt.Println(err)
+	errChan := make(chan error)
+	go func() {
+		err := cl.WatchConfig(context.Background(), c, confl.ReloadFunc(reload), errChan)
+		_ = err
+	}()
+
+	for range errChan {
 	}
 }
