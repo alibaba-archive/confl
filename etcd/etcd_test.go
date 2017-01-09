@@ -12,20 +12,20 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	var cl1 = &Confl{}
+	var cl1 = &Client{}
 	var cl2 confl.Confl
 	assert.NotPanics(t, func() {
 		cl2 = cl1
 	})
 }
 
-func TestEtcdConfl(t *testing.T) {
+func TestClientStruct(t *testing.T) {
 	cfg := Config{
 		Clusters: []string{"http://localhost:2379"},
 	}
 	cfg.ConfPath = "/confl/test"
 	// local etcd server without tls and basic auth
-	cl, err := NewConfl(cfg)
+	cl, err := NewClient(cfg)
 	assert.Nil(t, err)
 
 	t.Run("watch", func(t *testing.T) {
@@ -47,6 +47,8 @@ func TestEtcdConfl(t *testing.T) {
 				assert.Equal(value, resp.Node.Value)
 			}
 		}()
+		// wait until watch get ready
+		time.Sleep(time.Second)
 		for _, value := range values {
 			_, err := cl.client.Set(context.Background(), cfg.ConfPath, value, &client.SetOptions{TTL: 10 * time.Second})
 			assert.Nil(err)
@@ -97,22 +99,28 @@ func TestEtcdConfl(t *testing.T) {
 			}
 			c := config{}
 			valueChan := make(chan config)
-			cl.WatchConfig(context.Background(), &c, func() error {
-				value := <-valueChan
-				assert.Equal(value.Name, c.Name)
-				assert.Equal(value.Age, c.Age)
-				return nil
-			})
+			errChan := make(chan error)
 
 			go func() {
-				for _, value := range values {
-					data, err := json.Marshal(value)
-					assert.Nil(err)
-					_, err = cl.client.Set(context.Background(), cfg.ConfPath, string(data), &client.SetOptions{TTL: 10 * time.Second})
-					assert.Nil(err)
-					valueChan <- value
-				}
+				err := cl.WatchConfig(context.Background(), &c, confl.ReloadFunc(func() error {
+					value := <-valueChan
+					assert.Equal(value.Name, c.Name)
+					assert.Equal(value.Age, c.Age)
+					return nil
+				}), errChan)
+				assert.Nil(err)
 			}()
+
+			// wait until watch get ready
+			time.Sleep(time.Second)
+			for _, value := range values {
+				data, err := json.Marshal(value)
+				assert.Nil(err)
+				_, err = cl.client.Set(context.Background(), cfg.ConfPath, string(data), &client.SetOptions{TTL: 10 * time.Second})
+				assert.Nil(err)
+				valueChan <- value
+			}
+
 		})
 	})
 }

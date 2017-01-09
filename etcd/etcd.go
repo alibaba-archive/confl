@@ -12,24 +12,25 @@ import (
 
 	"github.com/coreos/etcd/client"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/teambition/confl"
 )
 
-type Confl struct {
+type Client struct {
 	confPath string
 	client   client.KeysAPI
 }
 
-func NewConflFromEnv() (*Confl, error) {
+func NewClientFromEnv() (*Client, error) {
 	var cfg Config
 	err := envconfig.Process("", &cfg)
 	if err != nil {
 		return nil, err
 	}
-	return NewConfl(cfg)
+	return NewClient(cfg)
 }
 
-// NewConfl return a *etcd.Client perhaps need auth or tls
-func NewConfl(cfg Config) (*Confl, error) {
+// NewClient return a *etcd.Client perhaps need auth or tls
+func NewClient(cfg Config) (*Client, error) {
 	var (
 		c    client.Client
 		kapi client.KeysAPI
@@ -90,49 +91,50 @@ func NewConfl(cfg Config) (*Confl, error) {
 	}
 
 	kapi = client.NewKeysAPI(c)
-	return &Confl{confPath: cfg.ConfPath, client: kapi}, nil
+	return &Client{confPath: cfg.ConfPath, client: kapi}, nil
 
 }
 
 // watch the confPath changes from etcd
 // error will be ignored
-func (c *Confl) watch(ctx context.Context, respChan chan<- *client.Response) error {
-	defer close(respChan)
+func (c *Client) watch(ctx context.Context, respChan chan<- *client.Response) error {
 	for {
-		// if context canced then stop watch
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
 		// set AfterIndex to 0 means watcher watch events begin at newest index
 		// set Recursive to false means that the key must be exsited and not be a dir
 		watcher := c.client.Watcher(c.confPath, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
 		resp, err := watcher.Next(ctx)
 		if err != nil {
-			// if error happened need sleep before continue
-			time.Sleep(time.Second)
-			continue
+			// perhaps some terrible error happened
+			// caller need recall WatchConfig
+			return err
 		}
 
 		if resp.Node.Dir {
+			// do not care about directory
 			return ErrorUnexpectedDir
 		}
-		respChan <- resp
+
+		select {
+		// if context canced then stop watch
+		case <-ctx.Done():
+			return ctx.Err()
+		case respChan <- resp:
+		}
 	}
 	return nil
 }
 
 // Get the latest value of key by Quorum = true
-func (c *Confl) get(ctx context.Context) (*client.Response, error) {
+func (c *Client) get(ctx context.Context) (*client.Response, error) {
 	resp, err := c.client.Get(ctx, c.confPath, &client.GetOptions{
 		Recursive: false,
 		Quorum:    true,
 	})
+
 	if err != nil {
 		return nil, err
 	}
+
 	if resp.Node.Dir {
 		return nil, ErrorUnexpectedDir
 	}
@@ -140,44 +142,51 @@ func (c *Confl) get(ctx context.Context) (*client.Response, error) {
 }
 
 // LoadConfig get value from etcd backend by the confPath
-func (c *Confl) LoadConfig(ctx context.Context, config interface{}) error {
+func (c *Client) LoadConfig(ctx context.Context, config interface{}) error {
 	resp, err := c.get(ctx)
 	if err != nil {
 		return err
 	}
+
 	return json.Unmarshal([]byte(resp.Node.Value), config)
 }
 
 // WatchConfig initialize the config from etcd with confPath firstly
 // Then watch the changes of the confPath and reassign config
 // Call reload when success
-func (c *Confl) WatchConfig(ctx context.Context, config interface{}, reload func() error) <-chan error {
-	respChan := make(chan *client.Response)
-	errChan := make(chan error)
+func (c *Client) WatchConfig(ctx context.Context, config interface{}, reload confl.Reloader, errChan chan<- error) error {
 	err := c.LoadConfig(ctx, config)
 	if err != nil {
-		errChan <- err
+		return err
+	}
+
+	respChan := make(chan *client.Response)
+
+	noWaitErrChan := func(errChan chan<- error, err error) {
+		if err != nil {
+			select {
+			case errChan <- err:
+			default:
+				// if errChan is full then miss this err
+			}
+		}
 	}
 
 	// watch the key changes
 	go func() {
 		err := c.watch(ctx, respChan)
-		if err != nil {
-			errChan <- err
-		}
+		noWaitErrChan(errChan, err)
+		close(respChan)
 	}()
 
-	go func() {
-		for range respChan {
-			err := c.LoadConfig(ctx, config)
-			if err != nil {
-				errChan <- err
-				continue
-			}
-			if err = reload(); err != nil {
-				errChan <- err
-			}
+	for range respChan {
+		err := c.LoadConfig(ctx, config)
+		noWaitErrChan(errChan, err)
+		if err == nil {
+			err = reload.Reload()
+			noWaitErrChan(errChan, err)
 		}
-	}()
-	return errChan
+
+	}
+	return nil
 }
