@@ -15,7 +15,8 @@ import (
 )
 
 type Confl struct {
-	client client.KeysAPI
+	confPath string
+	client   client.KeysAPI
 }
 
 func NewConflFromEnv() (*Confl, error) {
@@ -89,13 +90,13 @@ func NewConfl(cfg Config) (*Confl, error) {
 	}
 
 	kapi = client.NewKeysAPI(c)
-	return &Confl{kapi}, nil
+	return &Confl{confPath: cfg.ConfPath, client: kapi}, nil
 
 }
 
-// watch the key changes from etcd
+// watch the confPath changes from etcd
 // error will be ignored
-func (c *Confl) watch(ctx context.Context, key string, respChan chan<- *client.Response) error {
+func (c *Confl) watch(ctx context.Context, respChan chan<- *client.Response) error {
 	defer close(respChan)
 	for {
 		// if context canced then stop watch
@@ -107,7 +108,7 @@ func (c *Confl) watch(ctx context.Context, key string, respChan chan<- *client.R
 
 		// set AfterIndex to 0 means watcher watch events begin at newest index
 		// set Recursive to false means that the key must be exsited and not be a dir
-		watcher := c.client.Watcher(key, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
+		watcher := c.client.Watcher(c.confPath, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
 		resp, err := watcher.Next(ctx)
 		if err != nil {
 			// if error happened need sleep before continue
@@ -124,8 +125,8 @@ func (c *Confl) watch(ctx context.Context, key string, respChan chan<- *client.R
 }
 
 // Get the latest value of key by Quorum = true
-func (c *Confl) get(ctx context.Context, key string) (*client.Response, error) {
-	resp, err := c.client.Get(ctx, key, &client.GetOptions{
+func (c *Confl) get(ctx context.Context) (*client.Response, error) {
+	resp, err := c.client.Get(ctx, c.confPath, &client.GetOptions{
 		Recursive: false,
 		Quorum:    true,
 	})
@@ -138,29 +139,29 @@ func (c *Confl) get(ctx context.Context, key string) (*client.Response, error) {
 	return resp, nil
 }
 
-// LoadConfig get value from etcd backend by the given key
-func (c *Confl) LoadConfig(ctx context.Context, config interface{}, key string) error {
-	resp, err := c.get(ctx, key)
+// LoadConfig get value from etcd backend by the confPath
+func (c *Confl) LoadConfig(ctx context.Context, config interface{}) error {
+	resp, err := c.get(ctx)
 	if err != nil {
 		return err
 	}
 	return json.Unmarshal([]byte(resp.Node.Value), config)
 }
 
-// WatchConfig initialize the config from etcd with given key firstly
-// Then watch the changes of the key and reassign config
+// WatchConfig initialize the config from etcd with confPath firstly
+// Then watch the changes of the confPath and reassign config
 // Call reload when success
-func (c *Confl) WatchConfig(ctx context.Context, config interface{}, key string, reload func() error) <-chan error {
+func (c *Confl) WatchConfig(ctx context.Context, config interface{}, reload func() error) <-chan error {
 	respChan := make(chan *client.Response)
 	errChan := make(chan error)
-	err := c.LoadConfig(ctx, config, key)
+	err := c.LoadConfig(ctx, config)
 	if err != nil {
 		errChan <- err
 	}
 
 	// watch the key changes
 	go func() {
-		err := c.watch(ctx, key, respChan)
+		err := c.watch(ctx, respChan)
 		if err != nil {
 			errChan <- err
 		}
@@ -168,7 +169,7 @@ func (c *Confl) WatchConfig(ctx context.Context, config interface{}, key string,
 
 	go func() {
 		for range respChan {
-			err := c.LoadConfig(ctx, config, key)
+			err := c.LoadConfig(ctx, config)
 			if err != nil {
 				errChan <- err
 				continue

@@ -12,6 +12,7 @@ func TestConfigEnv(t *testing.T) {
 	assert := assert.New(t)
 	var cfg Config
 	clusters := []string{"http://node1.example.com:2379", "http://node2.example.com:2379", "http://node3.example.com:2379"}
+	confPath := "/test"
 	clustersStr := "http://node1.example.com:2379,http://node2.example.com:2379,http://node3.example.com:2379"
 	cert := "1"
 	key := "2"
@@ -19,6 +20,7 @@ func TestConfigEnv(t *testing.T) {
 	username := "4"
 	password := "5"
 	os.Clearenv()
+	os.Setenv("CONFL_CONF_PATH", confPath)
 	os.Setenv("CONFL_ETCD_CLUSTERS", clustersStr)
 	os.Setenv("CONFL_ETCD_CERT", cert)
 	os.Setenv("CONFL_ETCD_KEY", key)

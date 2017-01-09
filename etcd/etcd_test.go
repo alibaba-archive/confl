@@ -23,13 +23,13 @@ func TestEtcdConfl(t *testing.T) {
 	cfg := Config{
 		Clusters: []string{"http://localhost:2379"},
 	}
+	cfg.ConfPath = "/confl/test"
 	// local etcd server without tls and basic auth
 	cl, err := NewConfl(cfg)
 	assert.Nil(t, err)
 
 	t.Run("watch", func(t *testing.T) {
 		assert := assert.New(t)
-		key := "/confl/watch/test"
 		values := []string{
 			"test1",
 			"test2",
@@ -38,7 +38,7 @@ func TestEtcdConfl(t *testing.T) {
 		valueChan := make(chan string)
 		respChan := make(chan *client.Response)
 		go func() {
-			err := cl.watch(context.Background(), key, respChan)
+			err := cl.watch(context.Background(), respChan)
 			assert.Nil(err)
 		}()
 		go func() {
@@ -48,7 +48,7 @@ func TestEtcdConfl(t *testing.T) {
 			}
 		}()
 		for _, value := range values {
-			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{TTL: 10 * time.Second})
+			_, err := cl.client.Set(context.Background(), cfg.ConfPath, value, &client.SetOptions{TTL: 10 * time.Second})
 			assert.Nil(err)
 			valueChan <- value
 		}
@@ -56,15 +56,15 @@ func TestEtcdConfl(t *testing.T) {
 
 	t.Run("get", func(t *testing.T) {
 		assert := assert.New(t)
-		kvs := map[string]string{
-			"/confl/get/test1": "test1",
-			"/confl/get/test2": "test2",
-			"/confl/get/test3": "test2",
+		values := []string{
+			"test1",
+			"test2",
+			"test3",
 		}
-		for key, value := range kvs {
-			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{TTL: 10 * time.Second})
+		for _, value := range values {
+			_, err := cl.client.Set(context.Background(), cfg.ConfPath, value, &client.SetOptions{TTL: 10 * time.Second})
 			assert.Nil(err)
-			resp, err := cl.get(context.Background(), key)
+			resp, err := cl.get(context.Background())
 			assert.Nil(err)
 			assert.Equal(value, resp.Node.Value)
 		}
@@ -75,15 +75,14 @@ func TestEtcdConfl(t *testing.T) {
 			Name string `json:"name"`
 			Age  int    `json:"age"`
 		}
-		key := "/confl/load/test"
 
 		t.Run("LoadConfig", func(t *testing.T) {
 			assert := assert.New(t)
 			value := `{"name": "confl", "age": 18}`
-			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{TTL: 10 * time.Second})
+			_, err := cl.client.Set(context.Background(), cfg.ConfPath, value, &client.SetOptions{TTL: 10 * time.Second})
 			assert.Nil(err)
 			c := config{}
-			err = cl.LoadConfig(context.Background(), &c, key)
+			err = cl.LoadConfig(context.Background(), &c)
 			assert.Nil(err)
 			assert.Equal("confl", c.Name)
 			assert.Equal(18, c.Age)
@@ -98,7 +97,7 @@ func TestEtcdConfl(t *testing.T) {
 			}
 			c := config{}
 			valueChan := make(chan config)
-			cl.WatchConfig(context.Background(), &c, key, func() error {
+			cl.WatchConfig(context.Background(), &c, func() error {
 				value := <-valueChan
 				assert.Equal(value.Name, c.Name)
 				assert.Equal(value.Age, c.Age)
@@ -109,7 +108,7 @@ func TestEtcdConfl(t *testing.T) {
 				for _, value := range values {
 					data, err := json.Marshal(value)
 					assert.Nil(err)
-					_, err = cl.client.Set(context.Background(), key, string(data), &client.SetOptions{TTL: 10 * time.Second})
+					_, err = cl.client.Set(context.Background(), cfg.ConfPath, string(data), &client.SetOptions{TTL: 10 * time.Second})
 					assert.Nil(err)
 					valueChan <- value
 				}

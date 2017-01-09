@@ -13,6 +13,8 @@ func main() {
 		Clusters: []string{"http://localhost:2379"},
 	}
 
+	etcdConfig.ConfPath = "/teambition/auth-production"
+
 	confl, err := etcd.NewConfl(etcdConfig)
 	if err != nil {
 		panic(err)
@@ -49,9 +51,7 @@ func main() {
 	// write to etcd
 	_ = `{"username": "xushuai", "password": "VAULT(secret/password)", "phone": "VAULT(secret/phone)"}`
 
-	key := "/teambition/auth-production"
-
-	for err := range confl.WatchConfig(context.Background(), c, key, reload) {
+	for err := range confl.WatchConfig(context.Background(), c, reload) {
 		fmt.Println(err)
 	}
 }
