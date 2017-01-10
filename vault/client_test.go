@@ -15,24 +15,24 @@ func TestClient(t *testing.T) {
 	defer ln.Close()
 
 	assert := assert.New(t)
-	cfg := Config{
+
+	changeCh := make(chan struct{})
+	cfg := &Config{
 		AuthType: AuthToken,
 		Token:    token,
 		Address:  addr,
+		ChangeCh: changeCh,
 	}
-	v, err := NewClient(cfg)
+	err := Init(cfg)
 	assert.Nil(err)
 
 	type config struct {
 		Password *Secret `json:"password"`
 	}
 
-	c := config{
-		Password: v.Secret(),
-	}
 	password := "123456"
 
-	_, err = v.Client.Logical().Write("secret/password", map[string]interface{}{"value": password})
+	_, err = defaultClient.Client.Logical().Write("secret/password", map[string]interface{}{"value": password})
 	assert.Nil(err)
 	err = json.Unmarshal([]byte(`{"password": "VAULT(secret/password)"}`), &c)
 	assert.Nil(err)

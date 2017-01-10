@@ -50,7 +50,7 @@ func (s *Secret) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	s.Value, err = defaultClient.Key(s.Key)
+	s.Value, err = defaultClient.key(s.Key)
 	if err != nil {
 		return err
 	}

@@ -7,40 +7,40 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 	"time"
 
 	vaultapi "github.com/hashicorp/vault/api"
-	"github.com/kelseyhightower/envconfig"
 )
 
 var (
 	DefaultInterval = 5 * time.Minute
-	defaultClient   *Client
 )
 
-type Client struct {
+var (
+	defaultClient *client
+)
+
+type client struct {
 	*vaultapi.Client
-	kvs map[string]string
+	c      *Config
+	mu     sync.RWMutex
+	kvs    map[string]string
+	stopCh chan struct{}
 }
 
-// NewFromEnv initialize the Client with environment variables
-func NewClientFromEnv() (*Client, error) {
-	var cfg Config
-	err := envconfig.Process("", &cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	return NewClient(cfg)
-}
-
-func NewClient(cfg Config) (*Client, error) {
-	if defaultClient != nil {
-		return defaultClient, nil
-	}
-
+// Init initialize the vault defaultClient for r/w sercrets
+func Init(cfg *Config) error {
 	if cfg.AuthType == None {
-		return nil, errors.New("you have to set the auth type when using the vault backend")
+		return errors.New("you have to set the auth type when using the vault backend")
+	}
+
+	if cfg.Interval == 0 {
+		cfg.Interval = DefaultInterval
+	}
+
+	if cfg.ChangeCh == nil {
+		return errors.New("need change channel for watch changes")
 	}
 
 	var (
@@ -53,7 +53,7 @@ func NewClient(cfg Config) (*Client, error) {
 	if cfg.Cert != "" && cfg.Key != "" {
 		certificate, err := tls.LoadX509KeyPair(cfg.Cert, cfg.Key)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		tlsCfg.Certificates = []tls.Certificate{certificate}
 		tlsCfg.BuildNameToCertificate()
@@ -62,7 +62,7 @@ func NewClient(cfg Config) (*Client, error) {
 	if cfg.CAcert != "" {
 		cacert, err := ioutil.ReadFile(cfg.CAcert)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		certPool := x509.NewCertPool()
 		certPool.AppendCertsFromPEM(cacert)
@@ -71,51 +71,64 @@ func NewClient(cfg Config) (*Client, error) {
 
 	vcfg.HttpClient.Transport = &http.Transport{TLSClientConfig: tlsCfg}
 
-	client, err := vaultapi.NewClient(vcfg)
+	cl, err := vaultapi.NewClient(vcfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// auth typep
+	// auth type
 	var secret *vaultapi.Secret
 
 	// check the auth type and authenticate the vault service
 	switch cfg.AuthType {
 	case AppID:
-		secret, err = client.Logical().Write("/auth/app-id/login", map[string]interface{}{
+		secret, err = cl.Logical().Write("/auth/app-id/login", map[string]interface{}{
 			"app_id":  cfg.AppID,
 			"user_id": cfg.UserID,
 		})
 	case Github:
-		secret, err = client.Logical().Write("/auth/github/login", map[string]interface{}{
+		secret, err = cl.Logical().Write("/auth/github/login", map[string]interface{}{
 			"token": cfg.Token,
 		})
 	case Token:
-		client.SetToken(cfg.Token)
-		secret, err = client.Logical().Read("/auth/token/lookup-self")
+		cl.SetToken(cfg.Token)
+		secret, err = cl.Logical().Read("/auth/token/lookup-self")
 	case Pass:
-		secret, err = client.Logical().Write(fmt.Sprintf("/auth/userpass/login/%s", cfg.Username), map[string]interface{}{
+		secret, err = cl.Logical().Write(fmt.Sprintf("/auth/userpass/login/%s", cfg.Username), map[string]interface{}{
 			"password": cfg.Password,
 		})
 	}
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	if client.Token() == "" {
-		client.SetToken(secret.Auth.ClientToken)
+	if cl.Token() == "" {
+		cl.SetToken(secret.Auth.ClientToken)
 	}
 
-	defaultClient = &Client{client, map[string]string{}}
-	return defaultClient, nil
+	defaultClient = &client{
+		Client: cl,
+		c:      cfg,
+		kvs:    map[string]string{},
+		stopCh: make(chan struct{}),
+	}
+
+	go defaultClient.watch()
+	return nil
 }
 
-func (c *Client) addKV(key, value string) {
+// addKV when config struct contains *vault.Secret type
+// then add it's Key and Value to kvs for watch
+func (c *client) addKV(key, value string) {
+	c.mu.Lock()
 	c.kvs[key] = value
+	c.mu.Unlock()
 }
 
-func (c *Client) Key(key string) (string, error) {
+// key get the value by given key
+// value only support string type
+func (c *client) key(key string) (string, error) {
 	resp, err := c.Logical().Read(key)
 	if err != nil {
 		return "", err
@@ -135,29 +148,43 @@ func (c *Client) Key(key string) (string, error) {
 	return "", fmt.Errorf("vault secret key(%s) value needs a string type", key)
 }
 
-// WatchKey the key changes from etcd until be stopped
-func (c *Client) WatchKey(key string, reloadCh chan<- struct{}, stopCh <-chan struct{}, errCh chan<- error) {
-	t := time.Tick(DefaultInterval)
+// watch the key changes from kvs
+// it is triggered every c.c.Interval
+func (c *client) watch() {
+	t := time.Tick(c.c.Interval)
 	for {
 		select {
-		case <-stopCh:
+		case <-c.stopCh:
 			return
 		case <-t:
+			c.mu.RLock()
 			for key, value := range c.kvs {
-				v, err := c.Key(key)
+				v, err := c.key(key)
 				if err != nil {
-					errCh <- err
+					if c.c.OnError != nil {
+						c.c.OnError(err)
+					}
 					continue
 				}
 				if value != v {
-					reloadCh <- struct{}{}
+					c.c.ChangeCh <- struct{}{}
 					break
 				}
 			}
+			c.mu.RUnlock()
 		}
 	}
 }
 
-func (c *Client) Close() error {
-	return c.Close()
+func (c *client) close() error {
+	close(c.stopCh)
+	return nil
+}
+
+// Close close the defaultClient
+func Close() error {
+	if defaultClient != nil {
+		return defaultClient.close()
+	}
+	return nil
 }
