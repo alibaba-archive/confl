@@ -2,7 +2,7 @@ package confl
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -15,7 +15,7 @@ import (
 var (
 	DefaultChangeChan = 10
 	ConfPathEnv       = "CONFL_CONF_PATH"
-	ErrorNoConfPath   = errors.New("need config path")
+	ErrorNoConfPath   = fmt.Errorf("required env %s missing value", ConfPathEnv)
 )
 
 var (
