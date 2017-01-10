@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -25,41 +24,26 @@ type Config struct {
 	Password *vault.Secret `json:"password"`
 }
 
-func (c *Config) Path() string {
-	path, _ := os.LookupEnv("CONFL_CONF_PATH")
-	return path
-}
-
-func (c *Config) Unmarshal(data []byte) error {
-	// vault.Secret only supports json.Unmarshal
-	return json.Unmarshal(data, c)
-}
-
 func main() {
 	config := &Config{}
-	doneCh := make(chan struct{})
-	stopCh := make(chan struct{})
-	errCh := make(chan error, 10)
 	setEnv()
 	// set interval to 10 seconds just for test
 	// you need set it a little bigger
 	vault.DefaultInterval = 10 * time.Second
 
-	watch, err := confl.NewWatcherFromEnv(config, doneCh, stopCh, errCh)
+	watch, err := confl.NewFromEnv(config, nil)
 	if err != nil {
 		panic(err)
 	}
-	watch.AddReloaders(confl.ReloadFunc(func() error {
-		fmt.Printf("reload: %s\n", config.Username)
-		fmt.Printf("reload: %s\n", config.Password.Value)
-		return nil
-	}))
+
+	watch.AddHook(func(c interface{}) {
+		if config, ok := c.(*Config); ok {
+			fmt.Printf("change username: %s\n", config.Username)
+			fmt.Printf("change password: %s\n", config.Password.Value)
+		}
+	})
 	go watch.GoWatch()
-
-	fmt.Printf("load: %s\n", config.Username)
-	fmt.Printf("load: %s\n", config.Password)
-	for err := range errCh {
-		fmt.Println(err)
-	}
-
+	fmt.Printf("load username: %s\n", config.Username)
+	fmt.Printf("load password: %s\n", config.Password.Value)
+	time.Sleep(time.Hour)
 }
