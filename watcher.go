@@ -1,48 +1,101 @@
 package confl
 
 import (
+	"encoding/json"
 	"errors"
+	"log"
+	"os"
 	"sync"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/teambition/confl/etcd"
 	"github.com/teambition/confl/vault"
 )
 
 var (
-	DefaultReloaderChan = 10
+	DefaultChangeChan = 10
+	ConfPathEnv       = "CONFL_CONF_PATH"
+	ErrorNoConfPath   = errors.New("need config path")
 )
+
+var (
+	defautlOnError = func(err error) {
+		if err != nil {
+			log.Println(err)
+		}
+	}
+)
+
+type Hook func(config interface{})
 
 // Watcher manage the watch states
 type Watcher struct {
-	sync.RWMutex
-	c              Configuration
-	etcd, vault    Client
-	reloadCh       chan struct{}
-	reloaders      []Reloader
-	errCh          chan error
-	doneCh, stopCh chan struct{}
+	sync.Mutex
+	confPath string
+	// c the config struct user defined
+	c        interface{}
+	etcd     *etcd.Client
+	changeCh chan struct{}
+	hooks    []Hook
+	onError  func(error)
 }
 
-func NewWatcherFromEnv(c Configuration, doneCh, stopCh chan struct{}, errCh chan error) (*Watcher, error) {
-	var err error
-	if c.Path() == "" {
-		return nil, errors.New("need config path")
+// NewFromEnv create a config watcher from env
+func NewFromEnv(c interface{}, onError func(error)) (*Watcher, error) {
+	if onError == nil {
+		onError = defautlOnError
 	}
 
-	w := &Watcher{
-		c:         c,
-		reloadCh:  make(chan struct{}, DefaultReloaderChan),
-		reloaders: []Reloader{},
-		errCh:     errCh,
-		doneCh:    doneCh,
-		stopCh:    stopCh,
-	}
+	confPath, _ := os.LookupEnv(ConfPathEnv)
+	var (
+		err       error
+		etcdConf  = &etcd.Config{}
+		vaultConf = &vault.Config{}
+	)
 
-	if w.etcd, err = etcd.NewClientFromEnv(); err != nil {
+	if err = envconfig.Process("", etcdConf); err != nil {
 		return nil, err
 	}
 
-	if w.vault, err = vault.NewClientFromEnv(); err != nil {
+	if err = envconfig.Process("", vaultConf); err != nil {
+		return nil, err
+	}
+
+	return New(c, confPath, etcdConf, vaultConf, onError)
+}
+
+func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault.Config, onError func(error)) (*Watcher, error) {
+	var err error
+	if confPath == "" {
+		return nil, ErrorNoConfPath
+	}
+
+	if onError == nil {
+		onError = defautlOnError
+	}
+
+	if etcdConf.OnError == nil {
+		etcdConf.OnError = onError
+	}
+
+	if vaultConf.OnError == nil {
+		vaultConf.OnError = onError
+	}
+
+	w := &Watcher{
+		c:        c,
+		confPath: confPath,
+		changeCh: make(chan struct{}, DefaultChangeChan),
+		hooks:    []Hook{},
+		onError:  onError,
+	}
+
+	if w.etcd, err = etcd.NewClient(etcdConf); err != nil {
+		return nil, err
+	}
+
+	vaultConf.ChangeCh = w.changeCh
+	if err = vault.Init(vaultConf); err != nil {
 		return nil, err
 	}
 
@@ -53,56 +106,46 @@ func NewWatcherFromEnv(c Configuration, doneCh, stopCh chan struct{}, errCh chan
 	return w, nil
 }
 
-func (w *Watcher) AddReloaders(rs ...Reloader) {
+func (w *Watcher) AddHook(hooks ...Hook) {
 	w.Lock()
-	w.reloaders = append(w.reloaders, rs...)
+	w.hooks = append(w.hooks, hooks...)
 	w.Unlock()
 }
 
 func (w *Watcher) GoWatch() {
-	go w.etcd.WatchKey(w.c.Path(), w.reloadCh, w.stopCh, w.errCh)
-	go w.vault.WatchKey("", w.reloadCh, w.stopCh, w.errCh)
+	go w.etcd.WatchKey(w.confPath, w.changeCh)
 	w.runReloaders()
 }
 
 func (w *Watcher) Close() error {
-	close(w.reloadCh)
-	var err error
-	if err = w.etcd.Close(); err != nil {
-		return err
-	}
-
-	return w.vault.Close()
+	w.etcd.Close()
+	vault.Close()
+	close(w.changeCh)
+	return nil
 }
 
 func (w *Watcher) loadConfig() error {
-	v, err := w.etcd.Key(w.c.Path())
+	v, err := w.etcd.Key(w.confPath)
 	if err != nil {
 		return err
 	}
 
-	return w.c.Unmarshal([]byte(v))
+	return json.Unmarshal([]byte(v), w.c)
 }
 
 // runReloaders run reloaders when the value changes
 // which contained etcd and vault background storage
 func (w *Watcher) runReloaders() {
-	for range w.reloadCh {
-		w.Lock()
+	for range w.changeCh {
 		if err := w.loadConfig(); err != nil {
-			w.errCh <- err
+			w.onError(err)
 			continue
 		}
 
 		// reloaders have dependency order
 		// need run reload one by one
-		for _, r := range w.reloaders {
-			err := r.Reload()
-			if err != nil {
-				w.errCh <- err
-			}
-
+		for _, hook := range w.hooks {
+			hook(w.c)
 		}
-		w.Unlock()
 	}
 }
