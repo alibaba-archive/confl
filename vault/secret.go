@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -28,12 +29,19 @@ func secretKey(in string) (string, error) {
 // It is used to store the key that needs to be encrypted
 type Secret struct {
 	Key, Value string
-	vault      *Vault
 }
 
 // UnmarshalJSON implement the json.Unmarshaler interface
 // This will be executed when call the json.Unmarshal(data []byte, v interface{}) on this type
 func (s *Secret) UnmarshalJSON(b []byte) error {
+	if defaultClient == nil {
+		return errors.New("need initialize vault client")
+	}
+
+	if s == nil {
+		s = &Secret{}
+	}
+
 	var err error
 	// the json string like `"xxx"` so need remove the double quotes
 	tmp := strings.Trim(string(b), `"`)
@@ -42,22 +50,11 @@ func (s *Secret) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	resp, err := s.vault.Logical().Read(s.Key)
+	s.Value, err = defaultClient.Key(s.Key)
 	if err != nil {
 		return err
 	}
 
-	if resp == nil || resp.Data == nil {
-		return fmt.Errorf("vault secret key(%s) is not existed", s.Key)
-	}
-
-	if value, ok := resp.Data["value"]; ok {
-		// value just can only be string type
-		if text, ok := value.(string); ok {
-			s.Value = text
-			return nil
-		}
-	}
-
-	return fmt.Errorf("vault secret key(%s) value needs a string type", s.Key)
+	defaultClient.addKV(s.Key, s.Value)
+	return nil
 }

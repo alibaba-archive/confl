@@ -3,11 +3,11 @@ package vault
 type AuthType string
 
 const (
-	AuthNone   AuthType = ""
-	AuthAppID  AuthType = "app-id"
-	AuthToken  AuthType = "token"
-	AuthGithub AuthType = "github"
-	AuthPass   AuthType = "userpass"
+	None   AuthType = ""
+	AppID  AuthType = "app-id"
+	Token  AuthType = "token"
+	Github AuthType = "github"
+	Pass   AuthType = "userpass"
 )
 
 // use https://github.com/kelseyhightower/envconfig to parse the environment variables for config

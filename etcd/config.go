@@ -1,11 +1,6 @@
 package etcd
 
-import (
-	"github.com/teambition/confl"
-)
-
 type Config struct {
-	confl.BaseConf
 	Clusters []string `envconfig:"CONFL_ETCD_CLUSTERS" required:"true"`
 	Cert     string   `envconfig:"CONFL_ETCD_CERT"`
 	Key      string   `envconfig:"CONFL_ETCD_KEY"`
