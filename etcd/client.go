@@ -10,24 +10,16 @@ import (
 	"time"
 
 	"github.com/coreos/etcd/client"
-	"github.com/kelseyhightower/envconfig"
 )
 
 type Client struct {
+	c      *Config
 	client client.KeysAPI
-}
-
-func NewClientFromEnv() (*Client, error) {
-	var cfg Config
-	err := envconfig.Process("", &cfg)
-	if err != nil {
-		return nil, err
-	}
-	return NewClient(cfg)
+	stopCh chan struct{}
 }
 
 // NewClient return a *etcd.Client perhaps need auth or tls
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(cfg *Config) (*Client, error) {
 	var (
 		c    client.Client
 		kapi client.KeysAPI
@@ -88,8 +80,11 @@ func NewClient(cfg Config) (*Client, error) {
 	}
 
 	kapi = client.NewKeysAPI(c)
-	return &Client{client: kapi}, nil
-
+	return &Client{
+		c:      cfg,
+		client: kapi,
+		stopCh: make(chan struct{}),
+	}, nil
 }
 
 func (c *Client) watchNext(ctx context.Context, key string) (*client.Response, error) {
@@ -112,14 +107,16 @@ func (c *Client) watchNext(ctx context.Context, key string) (*client.Response, e
 }
 
 // WatchKey the key changes from etcd until be stopped
-func (c *Client) WatchKey(key string, reloadCh chan<- struct{}, stopCh <-chan struct{}, errCh chan<- error) {
+func (c *Client) WatchKey(key string, changeCh chan<- struct{}) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
 		for {
 			_, err := c.watchNext(ctx, key)
 			if err != nil {
-				errCh <- err
+				if c.c.OnError != nil {
+					c.c.OnError(err)
+				}
 				if ctx.Err() != nil {
 					// means context has canceled and stop watch
 					return
@@ -129,13 +126,13 @@ func (c *Client) WatchKey(key string, reloadCh chan<- struct{}, stopCh <-chan st
 				continue
 			}
 
-			reloadCh <- struct{}{}
+			changeCh <- struct{}{}
 		}
 	}()
 
 	select {
 	// canceled when stop
-	case <-stopCh:
+	case <-c.stopCh:
 		cancel()
 		return
 	}
@@ -160,5 +157,6 @@ func (c *Client) Key(key string) (string, error) {
 }
 
 func (c *Client) Close() error {
+	close(c.stopCh)
 	return nil
 }
