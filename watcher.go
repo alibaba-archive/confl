@@ -114,7 +114,7 @@ func (w *Watcher) AddHook(hooks ...Hook) {
 
 func (w *Watcher) GoWatch() {
 	go w.etcd.WatchKey(w.confPath, w.changeCh)
-	w.runReloaders()
+	w.procHooks()
 }
 
 func (w *Watcher) Close() error {
@@ -133,17 +133,16 @@ func (w *Watcher) loadConfig() error {
 	return json.Unmarshal([]byte(v), w.c)
 }
 
-// runReloaders run reloaders when the value changes
-// which contained etcd and vault background storage
-func (w *Watcher) runReloaders() {
+// procHooks reloads config and runs the hooks when the watched value has changed
+func (w *Watcher) procHooks() {
 	for range w.changeCh {
 		if err := w.loadConfig(); err != nil {
 			w.onError(err)
 			continue
 		}
 
-		// reloaders have dependency order
-		// need run reload one by one
+		// hooks must be called one by one
+		// bcs there may be dependencies
 		for _, hook := range w.hooks {
 			hook(w.c)
 		}
