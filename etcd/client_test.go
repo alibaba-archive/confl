@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"testing"
+	"time"
 
 	"encoding/json"
 
@@ -44,21 +45,15 @@ func TestClientStruct(t *testing.T) {
 			"test3",
 		}
 		valueCh := make(chan string)
-		respCh := make(chan *client.Response)
 		go func() {
 			for {
-				go func() {
-					resp, err := cl.watchNext(key)
-					if assert.Nil(err) {
-						respCh <- resp
-					}
-				}()
-				value := <-valueCh
-				resp := <-respCh
+				resp, err := cl.watchNext(key)
 				assert.Nil(err)
+				value := <-valueCh
 				assert.Equal(value, resp.Node.Value)
 			}
 		}()
+		time.Sleep(time.Second)
 		for _, value := range values {
 			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{})
 			assert.Nil(err)
