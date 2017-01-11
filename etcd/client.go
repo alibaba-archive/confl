@@ -23,12 +23,10 @@ func NewClient(cfg *Config) (*Client, error) {
 		err  error
 	)
 
-	var (
-		ecfg = client.Config{
-			Endpoints:               cfg.Clusters,
-			HeaderTimeoutPerRequest: 3 * time.Second,
-		}
-	)
+	ecfg := client.Config{
+		Endpoints:               cfg.Clusters,
+		HeaderTimeoutPerRequest: 3 * time.Second,
+	}
 
 	if cfg.Username != "" && cfg.Password != "" {
 		ecfg.Username = cfg.Username
@@ -63,7 +61,7 @@ func (c *Client) watchNext(key string) (*client.Response, error) {
 	resp, err := watcher.Next(c.ctx)
 	if err != nil {
 		// perhaps some terrible error happened
-		// caller need recall WatchConfig
+		// caller need recall WatchKey
 		return nil, err
 	}
 
@@ -83,7 +81,7 @@ func (c *Client) WatchKey(key string, changeCh chan<- struct{}) {
 				c.c.OnError(err)
 			}
 			if c.ctx.Err() != nil {
-				// means context has canceled and stop watch
+				// means context has be canceled and stop watch
 				return
 			}
 
