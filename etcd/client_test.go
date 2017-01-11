@@ -12,7 +12,7 @@ import (
 
 func TestClientStruct(t *testing.T) {
 	cfg := &Config{
-		Clusters: []string{"http://localhost:2379"},
+		Clusters: []string{"http://127.0.0.1:2379"},
 	}
 	// local etcd server without tls and basic auth
 	cl, err := NewClient(cfg)

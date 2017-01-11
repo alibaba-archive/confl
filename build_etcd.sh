@@ -9,5 +9,6 @@ tar xzvf "${FILE_NAME}"
 cd $FILE_ROOT
 
 echo "Starting etcd"
-./etcd &
+nobup ./etcd &
+cd -
 sleep 1
