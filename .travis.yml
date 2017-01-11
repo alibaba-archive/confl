@@ -4,6 +4,7 @@ go:
 - 1.7
 before_install:
 - bash build_etcd.sh
+- go get -t -v ./...
 - cd $GOPATH/src/github.com/hashicorp/vault && git checkout v0.6.4 && cd -
 install:
 - go get github.com/haya14busa/reviewdog/cmd/reviewdog
