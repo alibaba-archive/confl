@@ -2,13 +2,14 @@
 
 [![Build Status](https://travis-ci.org/teambition/confl.svg?branch=master)](https://travis-ci.org/teambition/confl)
 
-Watch a distributed store and reload configurate.
-
+Configuration reload with etcd, security storage with vault!
 
 ## Features
 
+* Simple API for use
 * Used as a library
-* Auto-Reload
+* Care about updates of configuration
+* Support Auto-Reload method
 
 ## Getting Started
 
@@ -20,7 +21,7 @@ go get -u -v github.com/teambition/confl
 
 #### usage
 
-used with environment sets
+used with environment variables
 
 ```shell
 # env var
@@ -58,4 +59,4 @@ export CONFL_VAULT_KEY=/path/to/key
 export CONFL_VAULT_CACERT=/path/to/cacert
 ```
 
-see [examples](examples/)
+examples [examples](examples/)
