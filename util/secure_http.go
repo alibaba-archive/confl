@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// New comment here
 func SecureTransport(cacert, cert, key string) (*http.Transport, error) {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
