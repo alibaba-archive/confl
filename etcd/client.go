@@ -15,7 +15,8 @@ import (
 type Client struct {
 	c      *Config
 	client client.KeysAPI
-	stopCh chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // NewClient return a *etcd.Client perhaps need auth or tls
@@ -80,19 +81,21 @@ func NewClient(cfg *Config) (*Client, error) {
 	}
 
 	kapi = client.NewKeysAPI(c)
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Client{
 		c:      cfg,
 		client: kapi,
-		stopCh: make(chan struct{}),
+		ctx:    ctx,
+		cancel: cancel,
 	}, nil
 }
 
-func (c *Client) watchNext(ctx context.Context, key string) (*client.Response, error) {
+func (c *Client) watchNext(key string) (*client.Response, error) {
 	// set AfterIndex to 0 means watcher watch events begin at newest index
 	// set Recursive to false means that the key must be exsited and not be a dir
 	watcher := c.client.Watcher(key, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
 
-	resp, err := watcher.Next(ctx)
+	resp, err := watcher.Next(c.ctx)
 	if err != nil {
 		// perhaps some terrible error happened
 		// caller need recall WatchConfig
@@ -108,33 +111,22 @@ func (c *Client) watchNext(ctx context.Context, key string) (*client.Response, e
 
 // WatchKey the key changes from etcd until be stopped
 func (c *Client) WatchKey(key string, changeCh chan<- struct{}) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	go func() {
-		for {
-			_, err := c.watchNext(ctx, key)
-			if err != nil {
-				if c.c.OnError != nil {
-					c.c.OnError(err)
-				}
-				if ctx.Err() != nil {
-					// means context has canceled and stop watch
-					return
-				}
-
-				time.Sleep(2 * time.Second)
-				continue
+	for {
+		_, err := c.watchNext(key)
+		if err != nil {
+			if c.c.OnError != nil {
+				c.c.OnError(err)
+			}
+			if c.ctx.Err() != nil {
+				// means context has canceled and stop watch
+				return
 			}
 
-			changeCh <- struct{}{}
+			time.Sleep(2 * time.Second)
+			continue
 		}
-	}()
 
-	select {
-	// canceled when stop
-	case <-c.stopCh:
-		cancel()
-		return
+		changeCh <- struct{}{}
 	}
 }
 
@@ -157,6 +149,6 @@ func (c *Client) Key(key string) (string, error) {
 }
 
 func (c *Client) Close() error {
-	close(c.stopCh)
+	c.cancel()
 	return nil
 }

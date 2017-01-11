@@ -30,7 +30,7 @@ func TestClientStruct(t *testing.T) {
 		valueCh := make(chan string)
 		go func() {
 			for {
-				resp, err := cl.watchNext(context.Background(), key)
+				resp, err := cl.watchNext(key)
 				assert.Nil(err)
 				value := <-valueCh
 				assert.Equal(value, resp.Node.Value)
@@ -76,6 +76,7 @@ func TestClientStruct(t *testing.T) {
 
 		changeCh := make(chan struct{})
 		valueCh := make(chan string)
+		doneCh := make(chan struct{})
 		go cl.WatchKey(key, changeCh)
 		go func() {
 			for range changeCh {
@@ -83,6 +84,7 @@ func TestClientStruct(t *testing.T) {
 				value, err := cl.Key(key)
 				assert.Nil(err)
 				assert.Equal(v, value)
+				doneCh <- struct{}{}
 			}
 		}()
 		for _, value := range values {
@@ -92,6 +94,7 @@ func TestClientStruct(t *testing.T) {
 			_, err = cl.client.Set(context.Background(), key, v, &client.SetOptions{TTL: 10 * time.Second})
 			valueCh <- v
 			assert.Nil(err)
+			<-doneCh
 		}
 	})
 }
