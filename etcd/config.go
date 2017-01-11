@@ -1,7 +1,5 @@
 package etcd
 
-var a = 1
-
 // Config etcd clusters's configuration
 type Config struct {
 	Clusters []string `envconfig:"CONFL_ETCD_CLUSTERS" required:"true"`
