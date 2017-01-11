@@ -2,14 +2,10 @@ package etcd
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"io/ioutil"
-	"net"
-	"net/http"
 	"time"
 
 	"github.com/coreos/etcd/client"
+	"github.com/teambition/confl/util"
 )
 
 type Client struct {
@@ -28,17 +24,6 @@ func NewClient(cfg *Config) (*Client, error) {
 	)
 
 	var (
-		transport = &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			Dial: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).Dial,
-			TLSHandshakeTimeout: 10 * time.Second,
-		}
-		tlsCfg = &tls.Config{
-			InsecureSkipVerify: false,
-		}
 		ecfg = client.Config{
 			Endpoints:               cfg.Clusters,
 			HeaderTimeoutPerRequest: 3 * time.Second,
@@ -50,30 +35,10 @@ func NewClient(cfg *Config) (*Client, error) {
 		ecfg.Password = cfg.Password
 	}
 
-	if cfg.CAcert != "" {
-		cert, err := ioutil.ReadFile(cfg.CAcert)
-		if err != nil {
-			return nil, err
-		}
-
-		certPool := x509.NewCertPool()
-		ok := certPool.AppendCertsFromPEM(cert)
-
-		if ok {
-			tlsCfg.RootCAs = certPool
-		}
+	ecfg.Transport, err = util.SecureTransport(cfg.CAcert, cfg.Cert, cfg.Key)
+	if err != nil {
+		return nil, err
 	}
-
-	if cfg.Cert != "" && cfg.Key != "" {
-		certificate, err := tls.LoadX509KeyPair(cfg.Cert, cfg.Key)
-		if err != nil {
-			return nil, err
-		}
-		tlsCfg.Certificates = []tls.Certificate{certificate}
-	}
-
-	transport.TLSClientConfig = tlsCfg
-	ecfg.Transport = transport
 
 	c, err = client.New(ecfg)
 	if err != nil {

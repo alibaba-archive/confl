@@ -1,16 +1,13 @@
 package vault
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"sync"
 	"time"
 
 	vaultapi "github.com/hashicorp/vault/api"
+	"github.com/teambition/confl/util"
 )
 
 var (
@@ -44,32 +41,15 @@ func Init(cfg *Config) error {
 	}
 
 	var (
-		vcfg   = vaultapi.DefaultConfig()
-		tlsCfg = &tls.Config{}
+		err  error
+		vcfg = vaultapi.DefaultConfig()
 	)
 
 	vcfg.Address = cfg.Address
-
-	if cfg.Cert != "" && cfg.Key != "" {
-		certificate, err := tls.LoadX509KeyPair(cfg.Cert, cfg.Key)
-		if err != nil {
-			return err
-		}
-		tlsCfg.Certificates = []tls.Certificate{certificate}
-		tlsCfg.BuildNameToCertificate()
+	vcfg.HttpClient.Transport, err = util.SecureTransport(cfg.CAcert, cfg.Cert, cfg.Key)
+	if err != nil {
+		return err
 	}
-
-	if cfg.CAcert != "" {
-		cacert, err := ioutil.ReadFile(cfg.CAcert)
-		if err != nil {
-			return err
-		}
-		certPool := x509.NewCertPool()
-		certPool.AppendCertsFromPEM(cacert)
-		tlsCfg.RootCAs = certPool
-	}
-
-	vcfg.HttpClient.Transport = &http.Transport{TLSClientConfig: tlsCfg}
 
 	cl, err := vaultapi.NewClient(vcfg)
 	if err != nil {
