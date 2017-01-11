@@ -9,6 +9,16 @@ import (
 	"github.com/teambition/confl/vault"
 )
 
+// How it work?
+//
+// First, write `{"username": "username", "password": "VAULT(secret/password)"}` to etcd's key /confl/test
+// cli: etcdctl set /confl/test '{"username": "username", "password": "VAULT(secret/password)"}'
+//
+// Second, write `123456` to vault's key secret/password
+// cli: vault write secret/password value=123456
+//
+// Then, watcher will get {"username": "username", "password": "123456"}
+
 func main() {
 	// all supported enviroment variables see README
 	// perfect fit the docker, k8s and swarm etc
