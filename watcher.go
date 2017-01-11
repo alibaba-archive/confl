@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"reflect"
 	"sync"
 
 	"github.com/kelseyhightower/envconfig"
@@ -26,6 +27,8 @@ var (
 	}
 )
 
+// Hook hook type
+// When configuration updates, then pass the copy of configuration to it
 type Hook func(config interface{})
 
 // Watcher manage the watch states
@@ -106,17 +109,33 @@ func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault
 	return w, nil
 }
 
+// Config return the copy of w.c
+// Example:
+//   cfg := w.Config().(MyConfigStruct)
+func (w *Watcher) Config() interface{} {
+	val := reflect.ValueOf(w.c)
+	if val.Kind() == reflect.Ptr {
+		val = reflect.Indirect(val)
+	}
+	return val.Interface()
+}
+
+// AddHook add hooks for the update events of configuration
 func (w *Watcher) AddHook(hooks ...Hook) {
 	w.Lock()
 	w.hooks = append(w.hooks, hooks...)
 	w.Unlock()
 }
 
+// GoWatch start watch the update events
+// It is blocked until the watcher is closed
 func (w *Watcher) GoWatch() {
 	go w.etcd.WatchKey(w.confPath, w.changeCh)
 	w.procHooks()
 }
 
+// Close close the watcher
+// Change channel must be closed finally in case of panic
 func (w *Watcher) Close() error {
 	w.etcd.Close()
 	vault.Close()
@@ -124,12 +143,14 @@ func (w *Watcher) Close() error {
 	return nil
 }
 
+// loadConfig load configuration from etcd by given conf_path
 func (w *Watcher) loadConfig() error {
 	v, err := w.etcd.Key(w.confPath)
 	if err != nil {
 		return err
 	}
 
+	// now configuration only support json type
 	return json.Unmarshal([]byte(v), w.c)
 }
 
@@ -144,7 +165,7 @@ func (w *Watcher) procHooks() {
 		// hooks must be called one by one
 		// bcs there may be dependencies
 		for _, hook := range w.hooks {
-			hook(w.c)
+			hook(w.Config())
 		}
 	}
 }
