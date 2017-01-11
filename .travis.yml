@@ -10,13 +10,14 @@ install:
 - go get github.com/haya14busa/reviewdog/cmd/reviewdog
 - go get github.com/modocache/gover
 - go get github.com/mattn/goveralls
+- go get github.com/golang/lint/golint
 script:
 - go test -coverprofile=vault.coverprofile ./vault
 - go test -coverprofile=etcd.coverprofile ./etcd
 - gover
 - goveralls -coverprofile=gover.coverprofile -service=travis-ci
 - >-
-  golint ./... | reviewdog -f=golint -ci=travi
+  golint ./... | reviewdog -f=golint -ci=travis
 env:
   global:
   - secure: REKEwn+EhfyCS8FMym+pO/J1Ue+r3NgvoV7DUlCnDSRM27K/wpDmljkC4N2JVIwjpirggOMUBP3Izslbtfj1YlNwYotx3OjFdBnqphMbVlwZibxj7xjVM/4zn8eT/MxK+yDrvmCa3ReDrmgPqBS5yTeGks11of3rXGkq4MW73ddr1IPgPg9yguO9T8DGpPUFp8H/q36+qr/ekHXStRj0OcD8u4ZtPluU9yi46r3+NSNdDCxNhjGZToH9Ug6JhmT2fmnxWR/2/muLAguyHto5Qzg9r6EKu1Ha2+xkDeTm4zIcfEU5J+Ip2gQ52FBWCtwALJnCMdz4wyI/ZLSR6QsIcFNW+jEHWw4iK+D5mqM6wgc5jweUtkCom/bS5JSAGtSUMcMO369o4K2T+UwClw8TnfVaadW4tbCStlvNRp/kRxSrikIygzMG85rnIAtfwDLUdw0/cMhUDExVYEO4NJINxaysytxt0kXA+z454EfiwJvaJ3+SPEpUJwQzzVNeUcTVwsRIUjYRh1n41m7n1m9BteHxpHGihbXY4T17xE1PjvYkOH44ol2Ib10k8EMMRd5mKwz8Q1brGn1vxs664209h3VQ9sISCo7mrNzgJNxgML6/Hq4c7JtYXQ3r1LQqsmLGsDKQGACUip3df/VeNOMZMBb41LHHyVp1B4q/4zdTKGc=
