@@ -18,7 +18,7 @@ func TestClient(t *testing.T) {
 
 	changeCh := make(chan struct{})
 	cfg := &Config{
-		AuthType: AuthToken,
+		AuthType: Token,
 		Token:    token,
 		Address:  addr,
 		ChangeCh: changeCh,
@@ -30,6 +30,7 @@ func TestClient(t *testing.T) {
 		Password *Secret `json:"password"`
 	}
 
+	c := config{}
 	password := "123456"
 
 	_, err = defaultClient.Client.Logical().Write("secret/password", map[string]interface{}{"value": password})
