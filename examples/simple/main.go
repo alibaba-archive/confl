@@ -37,7 +37,7 @@ func main() {
 	}
 
 	watch.AddHook(func(c interface{}) {
-		if config, ok := c.(*Config); ok {
+		if config, ok := c.(Config); ok {
 			fmt.Printf("change username: %s\n", config.Username)
 			fmt.Printf("change password: %s\n", config.Password.Value)
 		}
