@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION="v3.1.0-rc.1"
+VERSION="v2.2.2"
 FILE_ROOT="etcd-${VERSION}-linux-amd64"
 FILE_NAME="${FILE_ROOT}.tar.gz"
 
