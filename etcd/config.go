@@ -1,6 +1,8 @@
 package etcd
 
-// Etcd configuration reviewdog test
+var a = 1
+
+// Config etcd clusters's configuration
 type Config struct {
 	Clusters []string `envconfig:"CONFL_ETCD_CLUSTERS" required:"true"`
 	Cert     string   `envconfig:"CONFL_ETCD_CERT"`
