@@ -19,6 +19,23 @@ func TestClientStruct(t *testing.T) {
 	cl, err := NewClient(cfg)
 	assert.Nil(t, err)
 
+	t.Run("Key", func(t *testing.T) {
+		assert := assert.New(t)
+		key := "/confl/test1/key"
+		values := []string{
+			"test1",
+			"test2",
+			"test3",
+		}
+		for _, value := range values {
+			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{})
+			assert.Nil(err)
+			v, err := cl.Key(key)
+			assert.Nil(err)
+			assert.Equal(value, v)
+		}
+	})
+
 	t.Run("watchNext", func(t *testing.T) {
 		assert := assert.New(t)
 		key := "/confl/test1/watchnext"
@@ -31,33 +48,16 @@ func TestClientStruct(t *testing.T) {
 		go func() {
 			for {
 				resp, err := cl.watchNext(key)
-				assert.Nil(err)
 				value := <-valueCh
+				assert.Nil(err)
 				assert.Equal(value, resp.Node.Value)
 			}
 		}()
 		time.Sleep(time.Second)
 		for _, value := range values {
-			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{TTL: 10 * time.Second})
+			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{})
 			assert.Nil(err)
 			valueCh <- value
-		}
-	})
-
-	t.Run("Key", func(t *testing.T) {
-		assert := assert.New(t)
-		key := "/confl/test1/key"
-		values := []string{
-			"test1",
-			"test2",
-			"test3",
-		}
-		for _, value := range values {
-			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{TTL: 10 * time.Second})
-			assert.Nil(err)
-			v, err := cl.Key(key)
-			assert.Nil(err)
-			assert.Equal(value, v)
 		}
 	})
 
@@ -91,7 +91,7 @@ func TestClientStruct(t *testing.T) {
 			data, err := json.Marshal(value)
 			assert.Nil(err)
 			v := string(data)
-			_, err = cl.client.Set(context.Background(), key, v, &client.SetOptions{TTL: 10 * time.Second})
+			_, err = cl.client.Set(context.Background(), key, v, &client.SetOptions{})
 			valueCh <- v
 			assert.Nil(err)
 			<-doneCh
