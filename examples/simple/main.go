@@ -28,22 +28,34 @@ func main() {
 	config := &Config{}
 	setEnv()
 	// set interval to 10 seconds just for test
-	// you need set it a little bigger
+	// you need set it a little bigger in production
+	// perhaps DefaultInterval 5 minutes just ok
 	vault.DefaultInterval = 10 * time.Second
 
-	watch, err := confl.NewFromEnv(config, nil)
+	watcher, err := confl.NewFromEnv(config, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	watch.AddHook(func(c interface{}) {
-		if config, ok := c.(Config); ok {
-			fmt.Printf("change username: %s\n", config.Username)
-			fmt.Printf("change password: %s\n", config.Password.Value)
+	watcher.AddHook(func(c interface{}) {
+		if cfg, ok := c.(Config); ok {
+			{
+				// use cfg
+				fmt.Printf("change username: %s\n", cfg.Username)
+				fmt.Printf("change password: %s\n", cfg.Password.Value)
+			}
 		}
 	})
-	go watch.GoWatch()
-	fmt.Printf("load username: %s\n", config.Username)
-	fmt.Printf("load password: %s\n", config.Password.Value)
+
+	// start watch
+	go watcher.GoWatch()
+
+	cfg := watcher.Config().(Config)
+	{
+		// use cfg
+		fmt.Printf("load username: %s\n", cfg.Username)
+		fmt.Printf("load password: %s\n", cfg.Password.Value)
+	}
+
 	time.Sleep(time.Hour)
 }
