@@ -30,7 +30,7 @@ script:
     golint ./... | reviewdog -f=golint -ci=travis
 
 after_success:
-  - goveralls -coverprofile=coverage -service=travis-ci
+  - goveralls -coverprofile=coverage.txt -service=travis-ci
 
 env:
   global:
