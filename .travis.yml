@@ -2,14 +2,41 @@ sudo: false
 language: go
 go:
   - 1.7
+
 before_install:
   - bash build_etcd.sh
   - go get -t -v ./...
   - cd $GOPATH/src/github.com/hashicorp/vault && git checkout v0.6.4 && cd -
+
+install:
+  - go get github.com/haya14busa/reviewdog/cmd/reviewdog
   - go get github.com/modocache/gover
   - go get github.com/mattn/goveralls
+  - go get github.com/golang/lint/golint
+  - go get honnef.co/go/staticcheck/cmd/staticcheck
+  - go get honnef.co/go/simple/cmd/gosimple
+  - go get github.com/kisielk/errcheck
+  - go get honnef.co/go/unused/cmd/unused
+
+before_script:
+  - echo $TRAVIS
+  - echo $TRAVIS_PULL_REQUEST
+  - echo $TRAVIS_PULL_REQUEST_BRANCH
+  - echo $TRAVIS_COMMIT
+  - echo $TRAVIS_PULL_REQUEST_SHA
+  - echo $TRAVIS_REPO_SLUG
+  - echo $TRAVIS_SECURE_ENV_VARS
+
 script:
   - go test -coverprofile=vault.coverprofile ./vault
   - go test -coverprofile=etcd.coverprofile ./etcd
+  - >-
+    reviewdog -ci=travis
+
+after_success:
   - gover
   - goveralls -coverprofile=gover.coverprofile -service=travis-ci
+
+env:
+  global:
+    secure: IlYRR6Esh/i2VOoSJ4f8xarx4Z8paN5UZPCROuRdLAfoe/vM4FjQa9bkjwRdwQ5QdGZVFZvQVoXDzHiQrpM4tDuVUieKqJ6m2JtxL4kYgdNoeVvZpIxDkYy5jLRSGEm/GkZLrkcbaai8uy5HYtUW62UJJUgBRci0YQsDkZz5+AvKrAYuwQwbg+BQ1J131rsSmXJtyIgxJC20reJ1u3uCEs0Ib99g4l7czVd5sqmdukoaeMuSYQXDCYuU7wLDrga5x+9vFMHK6ifHvlw9ZuGVWPtN0H8UTAZJW5gNCk0LZr37OmhaapWmTVdhaJhCY1lsZlAdzZA3lx4hEb0h/6C6zQDFgA0M+SUegptJy20Hxr6Y3Cn6lduJeiSevEr1iNKVLTyGw1/XHd6pWQPOvugrRzCXF8LUwm6IVjhrnc/kW5RKd07jHGVS2XicFdyFyHEtkyZEOut/9bqxvGk+8d5l8ARRdweY5jg7grLHsDDjqskORowL1NIXzNd4BnTWUX7tAYs0D/TsfBN+TeMPuoPFQ/0Gv0W5RBDcMiAunYRtX1Le2PfUVK1sW9VBQGGHaMloHq5X4AHJQMerYkOHW88E6IajTBw7qhJfcE8OVn2lCgvD6wfFtxTWj/X3eB3CNe/y6bXTbG/+667ndvpymoNEcLnZcG57tB6i3JZPBWSGOfU=
