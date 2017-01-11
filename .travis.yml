@@ -3,11 +3,11 @@ language: go
 go:
   - 1.7
 before_install:
+  - bash build_etcd.sh
   - go get -t -v ./...
   - cd $GOPATH/src/github.com/hashicorp/vault && git checkout v0.6.4 && cd -
   - go get github.com/modocache/gover
   - go get github.com/mattn/goveralls
-  - bash build_etcd.sh
 script:
   - go test -coverprofile=vault.coverprofile ./vault
   - go test -coverprofile=etcd.coverprofile ./etcd
