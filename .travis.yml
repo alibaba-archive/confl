@@ -13,6 +13,10 @@ install:
   - go get github.com/modocache/gover
   - go get github.com/mattn/goveralls
   - go get github.com/golang/lint/golint
+  - go get honnef.co/go/staticcheck/cmd/staticcheck
+  - go get honnef.co/go/simple/cmd/gosimple
+  - go get github.com/kisielk/errcheck
+  - go get honnef.co/go/unused/cmd/unused
 
 before_script:
   - echo $TRAVIS
@@ -27,7 +31,7 @@ script:
   - go test -coverprofile=vault.coverprofile ./vault
   - go test -coverprofile=etcd.coverprofile ./etcd
   - >-
-    golint ./... | reviewdog -f=golint -ci=travis
+    reviewdog -ci=travis
 
 after_success:
   - gover
