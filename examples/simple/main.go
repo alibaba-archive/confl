@@ -40,7 +40,7 @@ func main() {
 		Username string `json:"username"`
 		// *vault.Secret is a secure type for store password, secret, token etc
 		// it will load value from vault which is a tool for managing secrets
-		Password *vault.Secret `json:"password"`
+		Password vault.Secret `json:"password"`
 	}
 
 	watcher, err := confl.NewFromEnv(&Config{}, nil)
