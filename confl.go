@@ -33,12 +33,14 @@ type Hook func(config interface{})
 
 // Watcher manage the watch states
 type Watcher struct {
-	sync.Mutex
 	confPath string
 	// c the config struct user defined
 	c        interface{}
+	copyL    sync.RWMutex
+	copyed   interface{}
 	etcd     *etcd.Client
 	changeCh chan struct{}
+	hookL    sync.Mutex
 	hooks    []Hook
 	onError  func(error)
 }
@@ -113,18 +115,16 @@ func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault
 // Example:
 //   cfg := w.Config().(MyConfigStruct)
 func (w *Watcher) Config() interface{} {
-	val := reflect.ValueOf(w.c)
-	if val.Kind() == reflect.Ptr {
-		val = reflect.Indirect(val)
-	}
-	return val.Interface()
+	w.copyL.RLock()
+	defer w.copyL.RUnlock()
+	return w.copyed
 }
 
 // AddHook add hooks for the update events of configuration
 func (w *Watcher) AddHook(hooks ...Hook) {
-	w.Lock()
+	w.hookL.Lock()
 	w.hooks = append(w.hooks, hooks...)
-	w.Unlock()
+	w.hookL.Unlock()
 }
 
 // GoWatch start watch the update events
@@ -151,7 +151,18 @@ func (w *Watcher) loadConfig() error {
 	}
 
 	// now configuration only support json type
-	return json.Unmarshal([]byte(v), w.c)
+	if err = json.Unmarshal([]byte(v), w.c); err != nil {
+		return err
+	}
+
+	val := reflect.ValueOf(w.c)
+	if val.Kind() == reflect.Ptr {
+		val = reflect.Indirect(val)
+	}
+	w.copyL.Lock()
+	w.copyed = val.Interface()
+	w.copyL.Unlock()
+	return nil
 }
 
 // procHooks reloads config and runs the hooks when the watched value has changed
