@@ -31,9 +31,9 @@ type Secret struct {
 	key, Value string
 }
 
-// UnmarshalJSON implement the json.Unmarshaler interface
+// UnmarshalText implement the json.Unmarshaler interface
 // This will be executed when call the json.Unmarshal(data []byte, v interface{}) on this type
-func (s *Secret) UnmarshalJSON(b []byte) error {
+func (s *Secret) UnmarshalText(b []byte) error {
 	if defaultClient == nil {
 		return errors.New("need initialize vault client")
 	}
@@ -43,8 +43,7 @@ func (s *Secret) UnmarshalJSON(b []byte) error {
 		err error
 	)
 
-	// the json string like `"xxx"` so need remove the double quotes
-	tmp.key, err = secretKey(strings.Trim(string(b), `"`))
+	tmp.key, err = secretKey(string(b))
 	if err != nil {
 		return err
 	}
