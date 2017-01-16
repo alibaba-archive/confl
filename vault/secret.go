@@ -28,7 +28,11 @@ func secretKey(in string) (string, error) {
 // Secret is a vault secret type. Some else like auth type and audit type
 // It is used to store the key that needs to be encrypted
 type Secret struct {
-	Key, Value string
+	key, value string
+}
+
+func (s *Secret) Value() string {
+	return s.value
 }
 
 // UnmarshalJSON implement the json.Unmarshaler interface
@@ -45,16 +49,16 @@ func (s *Secret) UnmarshalJSON(b []byte) error {
 	var err error
 	// the json string like `"xxx"` so need remove the double quotes
 	tmp := strings.Trim(string(b), `"`)
-	s.Key, err = secretKey(tmp)
+	s.key, err = secretKey(tmp)
 	if err != nil {
 		return err
 	}
 
-	s.Value, err = defaultClient.key(s.Key)
+	s.value, err = defaultClient.key(s.key)
 	if err != nil {
 		return err
 	}
 
-	defaultClient.addKV(s.Key, s.Value)
+	defaultClient.addKV(s.key, s.value)
 	return nil
 }

@@ -40,7 +40,7 @@ func main() {
 		Username string `json:"username"`
 		// *vault.Secret is a secure type for store password, secret, token etc
 		// it will load value from vault which is a tool for managing secrets
-		Password *vault.Secret `json:"password"`
+		Password vault.Secret `json:"password"`
 	}
 
 	watcher, err := confl.NewFromEnv(&Config{}, nil)
@@ -55,7 +55,7 @@ func main() {
 			{
 				// use cfg
 				fmt.Printf("change username: %s\n", cfg.Username)
-				fmt.Printf("change password: %s\n", cfg.Password.Value)
+				fmt.Printf("change password: %s\n", cfg.Password.Value())
 			}
 		}
 	})
@@ -69,7 +69,7 @@ func main() {
 	{
 		// use cfg
 		fmt.Printf("load username: %s\n", cfg.Username)
-		fmt.Printf("load password: %s\n", cfg.Password.Value)
+		fmt.Printf("load password: %s\n", cfg.Password.Value())
 	}
 
 	time.Sleep(time.Hour)
