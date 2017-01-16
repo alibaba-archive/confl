@@ -55,7 +55,7 @@ func main() {
 			{
 				// use cfg
 				fmt.Printf("change username: %s\n", cfg.Username)
-				fmt.Printf("change password: %s\n", cfg.Password.Value())
+				fmt.Printf("change password: %s\n", cfg.Password.Value)
 			}
 		}
 	})
@@ -69,7 +69,7 @@ func main() {
 	{
 		// use cfg
 		fmt.Printf("load username: %s\n", cfg.Username)
-		fmt.Printf("load password: %s\n", cfg.Password.Value())
+		fmt.Printf("load password: %s\n", cfg.Password.Value)
 	}
 
 	time.Sleep(time.Hour)
