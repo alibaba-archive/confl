@@ -107,7 +107,6 @@ func (c *Client) Key(key string) (string, error) {
 	if resp.Node.Dir {
 		return "", ErrorUnexpectedDir
 	}
-
 	return resp.Node.Value, nil
 }
 

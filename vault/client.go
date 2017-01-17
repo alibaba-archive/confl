@@ -124,7 +124,6 @@ func (c *client) key(key string) (string, error) {
 			return text, nil
 		}
 	}
-
 	return "", fmt.Errorf("vault secret key(%s) value needs a string type", key)
 }
 

@@ -29,15 +29,16 @@ var (
 
 // Hook hook type
 // When configuration updates, then pass the copy of configuration to it
-type Hook func(config interface{})
+type Hook func(oldCfg, newCfg interface{})
 
 // Watcher manage the watch states
 type Watcher struct {
 	confPath string
 	// c the config struct user defined
 	c        interface{}
-	copyL    sync.RWMutex
-	copyed   interface{}
+	oCopyed  interface{}
+	nCopyL   sync.RWMutex
+	nCopyed  interface{}
 	etcd     *etcd.Client
 	changeCh chan struct{}
 	hookL    sync.Mutex
@@ -107,7 +108,6 @@ func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault
 	if err = w.loadConfig(); err != nil {
 		return nil, err
 	}
-
 	return w, nil
 }
 
@@ -115,9 +115,9 @@ func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault
 // Example:
 //   cfg := w.Config().(MyConfigStruct)
 func (w *Watcher) Config() interface{} {
-	w.copyL.RLock()
-	defer w.copyL.RUnlock()
-	return w.copyed
+	w.nCopyL.RLock()
+	defer w.nCopyL.RUnlock()
+	return w.nCopyed
 }
 
 // AddHook add hooks for the update events of configuration
@@ -159,9 +159,18 @@ func (w *Watcher) loadConfig() error {
 	if val.Kind() == reflect.Ptr {
 		val = reflect.Indirect(val)
 	}
-	w.copyL.Lock()
-	w.copyed = val.Interface()
-	w.copyL.Unlock()
+
+	i := val.Interface()
+
+	if reflect.ValueOf(w.nCopyed).IsValid() {
+		w.oCopyed = w.nCopyed
+	} else {
+		w.oCopyed = i
+	}
+
+	w.nCopyL.Lock()
+	w.nCopyed = i
+	w.nCopyL.Unlock()
 	return nil
 }
 
@@ -176,7 +185,7 @@ func (w *Watcher) procHooks() {
 		// hooks must be called one by one
 		// bcs there may be dependencies
 		for _, hook := range w.hooks {
-			hook(w.Config())
+			hook(w.oCopyed, w.Config())
 		}
 	}
 }
