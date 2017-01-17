@@ -77,6 +77,8 @@ func Init(cfg *Config) error {
 		secret, err = cl.Logical().Write(fmt.Sprintf("/auth/userpass/login/%s", cfg.Username), map[string]interface{}{
 			"password": cfg.Password,
 		})
+	default:
+		return fmt.Errorf("unsupported auth type(%s)", cfg.AuthType)
 	}
 
 	if err != nil {

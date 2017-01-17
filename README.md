@@ -9,7 +9,7 @@ Configuration reload with etcd, security storage with vault!
 * Simple API for use
 * Used as a library
 * Care about updates of configuration
-* Support Auto-Reload method
+* Support Auto-Reload
 
 ## Getting Started
 
