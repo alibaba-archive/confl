@@ -1,8 +1,11 @@
-# confl
-
-[![Build Status](https://travis-ci.org/teambition/confl.svg?branch=master)](https://travis-ci.org/teambition/confl)
-
+Confl
+=====
 Configuration reload with etcd, security storage with vault!
+
+[![Build Status](http://img.shields.io/travis/teambition/confl.svg?style=flat-square)](https://travis-ci.org/teambition/confl)
+[![Coverage Status](http://img.shields.io/coveralls/teambition/confl.svg?style=flat-square)](https://coveralls.io/r/teambition/confl)
+[![License](http://img.shields.io/badge/license-mit-blue.svg?style=flat-square)](https://raw.githubusercontent.com/teambition/confl/master/LICENSE)
+[![GoDoc](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](http://godoc.org/github.com/teambition/confl)
 
 ## Features
 
@@ -13,15 +16,15 @@ Configuration reload with etcd, security storage with vault!
 
 ## Getting Started
 
-### install
+### Install
 
-#### install confl 
+#### Install confl
 
 ```shell
 go get -u -v github.com/teambition/confl
 ```
 
-#### vault with etcd backend
+#### Start vault with etcd backend
 
 ```shell
 cat vault.hcl
@@ -50,10 +53,9 @@ listener "tcp" {
 vault server -config=vault.hcl
 ```
 
-#### usage
+### Usage
 
-used with environment variables
-
+Use with environment variables:
 ```shell
 # env var
 # the configuration path
@@ -71,7 +73,7 @@ export CONFL_ETCD_PASSWORD=password
 
 # vault var
 # type of auth one in (app-id, token, github, userpass)
-export CONFL_VAULT_AUTH_TYPE=token 
+export CONFL_VAULT_AUTH_TYPE=token
 export CONFL_VAULT_ADDRESS=http://localhost:8200
 # case app-id
 # this is more useful for micro services
@@ -90,4 +92,23 @@ export CONFL_VAULT_KEY=/path/to/key
 export CONFL_VAULT_CACERT=/path/to/cacert
 ```
 
-examples [examples](examples/)
+More [examples](examples/)
+
+## Development
+
+### Test
+
+1. start a local etcd service:
+```shell
+etcd
+```
+
+2. start local valut service:
+```shell
+vault server -dev
+```
+
+3. test with cover:
+```shell
+make cover
+```
