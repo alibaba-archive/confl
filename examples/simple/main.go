@@ -27,7 +27,7 @@ func main() {
 	os.Setenv("CONFL_ETCD_CLUSTERS", "http://localhost:2379")
 	os.Setenv("CONFL_VAULT_AUTH_TYPE", "token")
 	os.Setenv("CONFL_VAULT_ADDRESS", "http://localhost:8200")
-	os.Setenv("CONFL_VAULT_TOKEN", "06900225-b34b-69de-7872-21a2c8b52306")
+	os.Setenv("CONFL_VAULT_TOKEN", "f1103197-d8a4-9ea7-026f-04fae02561af")
 
 	// set interval to 10 seconds just for test
 	// you need set it a little bigger in production
@@ -50,14 +50,14 @@ func main() {
 
 	// add hook for update events
 	// perhaps you need reload something that depends the configuration
-	watcher.AddHook(func(c interface{}) {
-		if cfg, ok := c.(Config); ok {
-			{
-				// use cfg
-				fmt.Printf("change username: %s\n", cfg.Username)
-				fmt.Printf("change password: %s\n", cfg.Password.Value)
-			}
-		}
+	watcher.AddHook(func(oc, nc interface{}) {
+		ocfg := oc.(Config)
+		ncfg := nc.(Config)
+		// use cfg
+		fmt.Printf("change old username: %s\n", ocfg.Username)
+		fmt.Printf("change old password: %s\n", ocfg.Password.Value)
+		fmt.Printf("change new username: %s\n", ncfg.Username)
+		fmt.Printf("change new password: %s\n", ncfg.Password.Value)
 	})
 
 	// start watch
@@ -66,11 +66,9 @@ func main() {
 
 	// get configuration from watcher
 	cfg := watcher.Config().(Config)
-	{
-		// use cfg
-		fmt.Printf("load username: %s\n", cfg.Username)
-		fmt.Printf("load password: %s\n", cfg.Password.Value)
-	}
+	// use cfg
+	fmt.Printf("load username: %s\n", cfg.Username)
+	fmt.Printf("load password: %s\n", cfg.Password.Value)
 
 	time.Sleep(time.Hour)
 }
