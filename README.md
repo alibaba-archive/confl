@@ -15,8 +15,39 @@ Configuration reload with etcd, security storage with vault!
 
 ### install
 
+#### install confl 
+
 ```shell
 go get -u -v github.com/teambition/confl
+```
+
+#### vault with etcd backend
+
+```shell
+cat vault.hcl
+```
+
+```hcl
+backend "etcd" {
+  # etcd listen address
+  address = "http://127.0.0.1:2379"
+  # root path in etcd
+  path = "vault/"
+}
+
+listener "tcp" {
+  # listen address
+  address = "localhost:8200"
+  # secure config
+  tls_disable = 1
+  # tls_cert_file = /path/to/cert/file
+  # tls_key_file = /path/to/key/file
+  # tls_min_version = tls12
+}
+```
+
+```shell
+vault server -config=vault.hcl
 ```
 
 #### usage
