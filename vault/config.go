@@ -1,7 +1,5 @@
 package vault
 
-import "time"
-
 type AuthType string
 
 const (
@@ -30,10 +28,7 @@ type Config struct {
 	Key  string `envconfig:"CONFL_VAULT_KEY"`
 	// CAcert pem
 	CAcert string `envconfig:"CONFL_VAULT_CACERT"`
-	// error handle
-	OnError func(error)
-	// send the value change events
-	ChangeCh chan struct{}
-	// interval of each
-	Interval time.Duration
+	// watch interval
+	// env vaule like `10s` `1m` `1h`
+	Interval string `envconfig:"CONFL_VAULT_INTERVAL"`
 }

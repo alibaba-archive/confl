@@ -43,15 +43,12 @@ type Watcher struct {
 	changeCh chan struct{}
 	hookL    sync.Mutex
 	hooks    []Hook
-	onError  func(error)
+	// OnError error handler
+	OnError func(error)
 }
 
 // NewFromEnv create a config watcher from env
-func NewFromEnv(c interface{}, onError func(error)) (*Watcher, error) {
-	if onError == nil {
-		onError = defautlOnError
-	}
-
+func NewFromEnv(c interface{}) (*Watcher, error) {
 	confPath, _ := os.LookupEnv(ConfPathEnv)
 	var (
 		err       error
@@ -67,25 +64,13 @@ func NewFromEnv(c interface{}, onError func(error)) (*Watcher, error) {
 		return nil, err
 	}
 
-	return New(c, confPath, etcdConf, vaultConf, onError)
+	return New(c, confPath, etcdConf, vaultConf)
 }
 
-func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault.Config, onError func(error)) (*Watcher, error) {
+func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault.Config) (*Watcher, error) {
 	var err error
 	if confPath == "" {
 		return nil, ErrorNoConfPath
-	}
-
-	if onError == nil {
-		onError = defautlOnError
-	}
-
-	if etcdConf.OnError == nil {
-		etcdConf.OnError = onError
-	}
-
-	if vaultConf.OnError == nil {
-		vaultConf.OnError = onError
 	}
 
 	w := &Watcher{
@@ -93,15 +78,13 @@ func New(c interface{}, confPath string, etcdConf *etcd.Config, vaultConf *vault
 		confPath: confPath,
 		changeCh: make(chan struct{}, DefaultChangeChan),
 		hooks:    []Hook{},
-		onError:  onError,
 	}
 
-	if w.etcd, err = etcd.NewClient(etcdConf); err != nil {
+	if w.etcd, err = etcd.NewClient(etcdConf, w.onError); err != nil {
 		return nil, err
 	}
 
-	vaultConf.ChangeCh = w.changeCh
-	if err = vault.Init(vaultConf); err != nil {
+	if err = vault.Init(vaultConf, w.changeCh, w.onError); err != nil {
 		return nil, err
 	}
 
@@ -125,6 +108,14 @@ func (w *Watcher) AddHook(hooks ...Hook) {
 	w.hookL.Lock()
 	w.hooks = append(w.hooks, hooks...)
 	w.hookL.Unlock()
+}
+
+func (w *Watcher) onError(err error) {
+	if w.OnError != nil {
+		w.OnError(err)
+	} else {
+		defautlOnError(err)
+	}
 }
 
 // GoWatch start watch the update events

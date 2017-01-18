@@ -11,11 +11,8 @@ import (
 )
 
 var (
-	DefaultInterval = 5 * time.Minute
-)
-
-var (
-	defaultClient *client
+	defaultClient   *client
+	defaultInterval = 5 * time.Minute
 )
 
 type client struct {
@@ -24,27 +21,36 @@ type client struct {
 	mu     sync.RWMutex
 	kvs    map[string]string
 	stopCh chan struct{}
+	//  watch interval
+	interval time.Duration
+	onError  func(err error)
+	changeCh chan struct{}
 }
 
 // Init initialize the vault defaultClient for r/w sercrets
-func Init(cfg *Config) error {
+func Init(cfg *Config, changeCh chan struct{}, optOnError ...func(err error)) error {
 	if cfg.AuthType == None {
 		return errors.New("you have to set the auth type when using the vault backend")
 	}
 
-	if cfg.Interval == 0 {
-		cfg.Interval = DefaultInterval
-	}
-
-	if cfg.ChangeCh == nil {
+	if changeCh == nil {
 		return errors.New("need change channel for watch changes")
 	}
 
 	var (
-		err  error
-		vcfg = vaultapi.DefaultConfig()
+		err      error
+		interval time.Duration
 	)
 
+	if cfg.Interval != "" {
+		if interval, err = time.ParseDuration(cfg.Interval); err != nil {
+			return err
+		}
+	} else {
+		interval = defaultInterval
+	}
+
+	vcfg := vaultapi.DefaultConfig()
 	vcfg.Address = cfg.Address
 	vcfg.HttpClient.Transport, err = util.SecureTransport(cfg.CAcert, cfg.Cert, cfg.Key)
 	if err != nil {
@@ -90,12 +96,17 @@ func Init(cfg *Config) error {
 	}
 
 	defaultClient = &client{
-		Client: cl,
-		c:      cfg,
-		kvs:    map[string]string{},
-		stopCh: make(chan struct{}),
+		Client:   cl,
+		c:        cfg,
+		kvs:      map[string]string{},
+		stopCh:   make(chan struct{}),
+		interval: interval,
+		changeCh: changeCh,
 	}
 
+	if len(optOnError) == 1 {
+		defaultClient.onError = optOnError[0]
+	}
 	go defaultClient.watch()
 	return nil
 }
@@ -132,7 +143,7 @@ func (c *client) key(key string) (string, error) {
 // watch the key changes from kvs
 // it is triggered every c.c.Interval
 func (c *client) watch() {
-	t := time.Tick(c.c.Interval)
+	t := time.Tick(c.interval)
 	for {
 		select {
 		case <-c.stopCh:
@@ -142,13 +153,13 @@ func (c *client) watch() {
 			for key, value := range c.kvs {
 				v, err := c.key(key)
 				if err != nil {
-					if c.c.OnError != nil {
-						c.c.OnError(err)
+					if c.onError != nil {
+						c.onError(err)
 					}
 					continue
 				}
 				if value != v {
-					c.c.ChangeCh <- struct{}{}
+					c.changeCh <- struct{}{}
 					break
 				}
 			}

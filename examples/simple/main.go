@@ -27,12 +27,11 @@ func main() {
 	os.Setenv("CONFL_ETCD_CLUSTERS", "http://localhost:2379")
 	os.Setenv("CONFL_VAULT_AUTH_TYPE", "token")
 	os.Setenv("CONFL_VAULT_ADDRESS", "http://localhost:8200")
-	os.Setenv("CONFL_VAULT_TOKEN", "f1103197-d8a4-9ea7-026f-04fae02561af")
-
+	os.Setenv("CONFL_VAULT_TOKEN", "teambition")
 	// set interval to 10 seconds just for test
 	// you need set it a little bigger in production
 	// perhaps DefaultInterval 5 minutes just ok
-	vault.DefaultInterval = 10 * time.Second
+	os.Setenv("CONFL_VAULT_INTERVAL", "10s")
 
 	// you configuration struct
 	// now just support json unmarshal
@@ -43,9 +42,14 @@ func main() {
 		Password vault.Secret `json:"password"`
 	}
 
-	watcher, err := confl.NewFromEnv(&Config{}, nil)
+	watcher, err := confl.NewFromEnv(&Config{})
 	if err != nil {
 		panic(err)
+	}
+
+	watcher.OnError = func(err error) {
+		fmt.Println("your error handler start")
+		fmt.Println(err)
 	}
 
 	// add hook for update events

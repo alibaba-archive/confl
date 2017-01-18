@@ -21,11 +21,10 @@ func TestVault(t *testing.T) {
 		// no auth type
 		changeCh := make(chan struct{})
 		cfg := &Config{
-			Token:    token,
-			Address:  addr,
-			ChangeCh: changeCh,
+			Token:   token,
+			Address: addr,
 		}
-		err := Init(cfg)
+		err := Init(cfg, changeCh)
 		assert.NotNil(err)
 
 		// no change channel
@@ -34,19 +33,17 @@ func TestVault(t *testing.T) {
 			Token:    token,
 			Address:  addr,
 		}
-		err = Init(cfg)
+		err = Init(cfg, nil)
 		assert.NotNil(err)
 
 		// error secure transport
-		changeCh = make(chan struct{})
 		cfg = &Config{
 			AuthType: Token,
 			Token:    token,
 			Address:  addr,
-			ChangeCh: changeCh,
 			CAcert:   "/path/to/noting",
 		}
-		err = Init(cfg)
+		err = Init(cfg, changeCh)
 		assert.NotNil(err)
 
 		// error vault address
@@ -55,32 +52,46 @@ func TestVault(t *testing.T) {
 			AuthType: Token,
 			Token:    token,
 			Address:  "xxxxxx",
-			ChangeCh: changeCh,
 		}
-		err = Init(cfg)
+		err = Init(cfg, changeCh)
 		assert.NotNil(err)
 
 		// unknown auth type
-		changeCh = make(chan struct{})
 		cfg = &Config{
 			AuthType: AuthType("hello"),
 			Address:  addr,
-			ChangeCh: changeCh,
 		}
-		err = Init(cfg)
+		err = Init(cfg, changeCh)
 		assert.NotNil(err)
 
 		// auth error
-		changeCh = make(chan struct{})
 		cfg = &Config{
 			AuthType: Token,
 			Token:    "error token",
 			Address:  addr,
-			ChangeCh: changeCh,
 		}
-		err = Init(cfg)
+		err = Init(cfg, changeCh)
 		assert.NotNil(err)
-		// auth type test unsupport
+
+		// interval test success
+		cfg = &Config{
+			AuthType: Token,
+			Token:    token,
+			Address:  addr,
+			Interval: "10s",
+		}
+		err = Init(cfg, changeCh)
+		assert.Equal(10*time.Second, defaultClient.interval)
+
+		// interval test fail
+		cfg = &Config{
+			AuthType: Token,
+			Token:    token,
+			Address:  addr,
+			Interval: "10x",
+		}
+		err = Init(cfg, changeCh)
+		assert.NotNil(err)
 	})
 
 	t.Run("defaultClient", func(t *testing.T) {
@@ -91,9 +102,8 @@ func TestVault(t *testing.T) {
 			AuthType: Token,
 			Token:    token,
 			Address:  addr,
-			ChangeCh: changeCh,
 		}
-		err := Init(cfg)
+		err := Init(cfg, changeCh)
 		require.Nil(err)
 
 		t.Run("key", func(t *testing.T) {
@@ -112,7 +122,7 @@ func TestVault(t *testing.T) {
 			assert.NotNil(err)
 		})
 
-		defaultClient.c.Interval = time.Second
+		defaultClient.interval = time.Second
 
 		t.Run("watch", func(t *testing.T) {
 			key := "secret/password"
@@ -159,7 +169,7 @@ func TestVault(t *testing.T) {
 			finishCh := make(chan struct{})
 
 			defaultClient.stopCh = make(chan struct{})
-			defaultClient.c.OnError = func(err error) {
+			defaultClient.onError = func(err error) {
 				assert.NotNil(err)
 				finishCh <- struct{}{}
 			}
@@ -169,7 +179,6 @@ func TestVault(t *testing.T) {
 			<-finishCh
 		})
 	})
-
 }
 
 func TestUninit(t *testing.T) {
