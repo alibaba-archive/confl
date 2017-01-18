@@ -2,9 +2,8 @@ package etcd
 
 import (
 	"context"
-	"testing"
-
 	"encoding/json"
+	"testing"
 
 	"github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"

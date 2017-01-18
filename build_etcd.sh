@@ -10,5 +10,4 @@ cd $FILE_ROOT
 
 echo "Starting etcd"
 ./etcd &
-cd -
-sleep 1
+sleep 3
