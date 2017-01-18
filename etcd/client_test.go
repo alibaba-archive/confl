@@ -7,18 +7,20 @@ import (
 
 	"github.com/coreos/etcd/client"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestClientStruct(t *testing.T) {
+func TestClient(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
 	cfg := &Config{
 		Clusters: []string{"http://127.0.0.1:2379"},
 	}
 	// local etcd server without tls and basic auth
 	cl, err := NewClient(cfg)
-	assert.Nil(t, err)
+	require.Nil(err)
 
 	t.Run("Key", func(t *testing.T) {
-		assert := assert.New(t)
 		key := "/confl/test1/key"
 		values := []string{
 			"test1",
@@ -27,15 +29,14 @@ func TestClientStruct(t *testing.T) {
 		}
 		for _, value := range values {
 			_, err := cl.client.Set(context.Background(), key, value, &client.SetOptions{})
-			assert.Nil(err)
+			require.Nil(err)
 			v, err := cl.Key(key)
-			assert.Nil(err)
+			require.Nil(err)
 			assert.Equal(value, v)
 		}
 	})
 
 	t.Run("WatchKey", func(t *testing.T) {
-		assert := assert.New(t)
 		type config struct {
 			Name string `json:"name"`
 			Age  int    `json:"age"`
@@ -50,24 +51,36 @@ func TestClientStruct(t *testing.T) {
 		changeCh := make(chan struct{})
 		valueCh := make(chan string)
 		doneCh := make(chan struct{})
-		go cl.WatchKey(key, changeCh)
+		finishCh := make(chan struct{})
+		go func() {
+			cl.WatchKey(key, changeCh)
+			finishCh <- struct{}{}
+		}()
+
 		go func() {
 			for range changeCh {
 				v := <-valueCh
 				value, err := cl.Key(key)
-				assert.Nil(err)
+				require.Nil(err)
 				assert.Equal(v, value)
 				doneCh <- struct{}{}
 			}
 		}()
+
 		for _, value := range values {
 			data, err := json.Marshal(value)
-			assert.Nil(err)
+			require.Nil(err)
 			v := string(data)
 			_, err = cl.client.Set(context.Background(), key, v, &client.SetOptions{})
+			require.Nil(err)
 			valueCh <- v
-			assert.Nil(err)
 			<-doneCh
 		}
+
+		t.Run("close", func(t *testing.T) {
+			cl.Close()
+			assert.Equal(struct{}{}, <-finishCh)
+		})
 	})
+
 }
