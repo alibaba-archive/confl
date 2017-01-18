@@ -3,6 +3,7 @@ package vault
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/vault/http"
 	"github.com/hashicorp/vault/vault"
@@ -111,6 +112,8 @@ func TestVault(t *testing.T) {
 			assert.NotNil(err)
 		})
 
+		defaultClient.c.Interval = time.Second
+
 		t.Run("watch", func(t *testing.T) {
 			key := "secret/password"
 			defaultClient.addKV(key, "test1")
@@ -119,19 +122,19 @@ func TestVault(t *testing.T) {
 				defaultClient.watch()
 				finishCh <- struct{}{}
 			}()
-			go func() { assert.Equal(<-changeCh, struct{}{}) }()
 			_, err = defaultClient.Client.Logical().Write(key, map[string]interface{}{"value": "test2"})
+			assert.Equal(struct{}{}, <-changeCh)
 			require.Nil(err)
 
 			t.Run("close", func(t *testing.T) {
-				defaultClient.close()
+				Close()
 				require.Equal(struct{}{}, <-finishCh)
 			})
 		})
 
 		t.Run("secret", func(t *testing.T) {
 			type config struct {
-				Password *Secret `json:"password"`
+				Password Secret `json:"password"`
 			}
 
 			c := config{}
@@ -148,6 +151,22 @@ func TestVault(t *testing.T) {
 
 			err = json.Unmarshal([]byte(`{"password": "VAULT(secret/unknown)"}`), &c)
 			assert.NotNil(err)
+		})
+
+		t.Run("watchError", func(t *testing.T) {
+			key := "secret/unknown"
+			defaultClient.addKV(key, "test1")
+			finishCh := make(chan struct{})
+
+			defaultClient.stopCh = make(chan struct{})
+			defaultClient.c.OnError = func(err error) {
+				assert.NotNil(err)
+				finishCh <- struct{}{}
+			}
+			go func() {
+				defaultClient.watch()
+			}()
+			<-finishCh
 		})
 	})
 
