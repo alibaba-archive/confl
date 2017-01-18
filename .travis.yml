@@ -28,8 +28,8 @@ before_script:
   - echo $TRAVIS_SECURE_ENV_VARS
 
 script:
-  - go test -race -coverprofile=vault.coverprofile ./vault
-  - go test -race -coverprofile=etcd.coverprofile ./etcd
+  - go test -coverprofile=vault.coverprofile ./vault
+  - go test -coverprofile=etcd.coverprofile ./etcd
   - >-
     reviewdog -ci=travis
 
