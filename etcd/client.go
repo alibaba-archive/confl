@@ -57,19 +57,7 @@ func (c *Client) watchNext(key string) (*client.Response, error) {
 	// set AfterIndex to 0 means watcher watch events begin at newest index
 	// set Recursive to false means that the key must be exsited and not be a dir
 	watcher := c.client.Watcher(key, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
-
-	resp, err := watcher.Next(c.ctx)
-	if err != nil {
-		// perhaps some terrible error happened
-		// caller need recall WatchKey
-		return nil, err
-	}
-
-	if resp.Node.Dir {
-		// do not care about directory
-		return nil, ErrorUnexpectedDir
-	}
-	return resp, nil
+	return watcher.Next(c.ctx)
 }
 
 // WatchKey the key changes from etcd until be stopped
