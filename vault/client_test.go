@@ -18,16 +18,29 @@ func TestVault(t *testing.T) {
 
 	t.Run("init", func(t *testing.T) {
 		assert := assert.New(t)
-		// no auth type
+		// init twice
 		changeCh := make(chan struct{})
 		cfg := &Config{
+			AuthType: Token,
+			Token:    token,
+			Address:  addr,
+		}
+		err := Init(cfg, changeCh)
+		err = Init(cfg, changeCh)
+		assert.NotNil(err)
+
+		// no auth type
+		defaultClient = nil
+		changeCh = make(chan struct{})
+		cfg = &Config{
 			Token:   token,
 			Address: addr,
 		}
-		err := Init(cfg, changeCh)
+		err = Init(cfg, changeCh)
 		assert.NotNil(err)
 
 		// no change channel
+		defaultClient = nil
 		cfg = &Config{
 			AuthType: Token,
 			Token:    token,
@@ -37,6 +50,7 @@ func TestVault(t *testing.T) {
 		assert.NotNil(err)
 
 		// error secure transport
+		defaultClient = nil
 		cfg = &Config{
 			AuthType: Token,
 			Token:    token,
@@ -47,6 +61,7 @@ func TestVault(t *testing.T) {
 		assert.NotNil(err)
 
 		// error vault address
+		defaultClient = nil
 		changeCh = make(chan struct{})
 		cfg = &Config{
 			AuthType: Token,
@@ -57,6 +72,7 @@ func TestVault(t *testing.T) {
 		assert.NotNil(err)
 
 		// unknown auth type
+		defaultClient = nil
 		cfg = &Config{
 			AuthType: AuthType("hello"),
 			Address:  addr,
@@ -65,6 +81,7 @@ func TestVault(t *testing.T) {
 		assert.NotNil(err)
 
 		// auth error
+		defaultClient = nil
 		cfg = &Config{
 			AuthType: Token,
 			Token:    "error token",
@@ -74,6 +91,7 @@ func TestVault(t *testing.T) {
 		assert.NotNil(err)
 
 		// interval test success
+		defaultClient = nil
 		cfg = &Config{
 			AuthType: Token,
 			Token:    token,
@@ -84,6 +102,7 @@ func TestVault(t *testing.T) {
 		assert.Equal(10*time.Second, defaultClient.interval)
 
 		// interval test fail
+		defaultClient = nil
 		cfg = &Config{
 			AuthType: Token,
 			Token:    token,
@@ -98,6 +117,7 @@ func TestVault(t *testing.T) {
 		assert := assert.New(t)
 		require := require.New(t)
 		changeCh := make(chan struct{})
+		defaultClient = nil
 		cfg := &Config{
 			AuthType: Token,
 			Token:    token,

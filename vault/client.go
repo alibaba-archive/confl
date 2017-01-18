@@ -29,12 +29,16 @@ type client struct {
 
 // Init initialize the vault defaultClient for r/w sercrets
 func Init(cfg *Config, changeCh chan struct{}, optOnError ...func(err error)) error {
-	if cfg.AuthType == None {
-		return errors.New("you have to set the auth type when using the vault backend")
+	if defaultClient != nil {
+		return errors.New("default client already exists")
 	}
 
 	if changeCh == nil {
 		return errors.New("need change channel for watch changes")
+	}
+
+	if cfg.AuthType == None {
+		return errors.New("you have to set the auth type when using the vault backend")
 	}
 
 	var (
