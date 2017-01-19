@@ -60,17 +60,13 @@ func NewClient(cfg *Config, optOnError ...func(err error)) (*Client, error) {
 	return ec, nil
 }
 
-func (c *Client) watchNext(key string) (*client.Response, error) {
-	// set AfterIndex to 0 means watcher watch events begin at newest index
-	// set Recursive to false means that the key must be exsited and not be a dir
-	watcher := c.client.Watcher(key, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
-	return watcher.Next(c.ctx)
-}
-
 // WatchKey the key changes from etcd until be stopped
 func (c *Client) WatchKey(key string, changeCh chan<- struct{}) {
 	for {
-		_, err := c.watchNext(key)
+		// set AfterIndex to 0 means watcher watch events begin at newest index
+		// set Recursive to false means that the key must be exsited and not be a dir
+		watcher := c.client.Watcher(key, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
+		_, err := watcher.Next(c.ctx)
 		if err != nil {
 			if c.onError != nil {
 				c.onError(err)
@@ -79,7 +75,7 @@ func (c *Client) WatchKey(key string, changeCh chan<- struct{}) {
 				// means context has be canceled and stop watch
 				return
 			}
-
+			// unexpected error happended
 			time.Sleep(2 * time.Second)
 			continue
 		}

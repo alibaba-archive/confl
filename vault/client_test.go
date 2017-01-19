@@ -122,6 +122,7 @@ func TestVault(t *testing.T) {
 			AuthType: Token,
 			Token:    token,
 			Address:  addr,
+			Interval: "1s",
 		}
 		err := Init(cfg, changeCh)
 		require.Nil(err)
@@ -142,23 +143,20 @@ func TestVault(t *testing.T) {
 			assert.NotNil(err)
 		})
 
-		defaultClient.interval = time.Second
-
 		t.Run("watch", func(t *testing.T) {
 			key := "secret/password"
 			defaultClient.addKV(key, "test1")
-			finishCh := make(chan struct{})
-			go func() {
-				defaultClient.watch()
-				finishCh <- struct{}{}
-			}()
 			_, err = defaultClient.Client.Logical().Write(key, map[string]interface{}{"value": "test2"})
-			assert.Equal(struct{}{}, <-changeCh)
 			require.Nil(err)
+			assert.Equal(struct{}{}, <-changeCh)
 
-			t.Run("close", func(t *testing.T) {
-				Close()
-				require.Equal(struct{}{}, <-finishCh)
+			t.Run("error", func(t *testing.T) {
+				key := "secret/unknown"
+				defaultClient.addKV(key, "test1")
+
+				defaultClient.onError = func(err error) {
+					assert.NotNil(err)
+				}
 			})
 		})
 
@@ -183,21 +181,13 @@ func TestVault(t *testing.T) {
 			assert.NotNil(err)
 		})
 
-		t.Run("watchError", func(t *testing.T) {
-			key := "secret/unknown"
-			defaultClient.addKV(key, "test1")
-			finishCh := make(chan struct{})
-
-			defaultClient.stopCh = make(chan struct{})
-			defaultClient.onError = func(err error) {
-				assert.NotNil(err)
-				finishCh <- struct{}{}
-			}
-			go func() {
-				defaultClient.watch()
-			}()
-			<-finishCh
+		t.Run("close", func(t *testing.T) {
+			Close()
+			assert.Panics(func() {
+				close(defaultClient.stopCh)
+			})
 		})
+
 	})
 }
 
