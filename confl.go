@@ -27,8 +27,8 @@ var (
 	}
 )
 
-// Hook hook type
-// When configuration updates, then pass the copy of configuration to it
+// Hook the handler of update events
+// pass the value of configuration(not ptr) to avoiding changing it
 type Hook func(oldCfg, newCfg interface{})
 
 // Watcher manage the watch states
@@ -146,19 +146,9 @@ func (w *Watcher) loadConfig() error {
 		return err
 	}
 
-	val := reflect.ValueOf(w.c)
-	if val.Kind() == reflect.Ptr {
-		val = reflect.Indirect(val)
-	}
-
-	i := val.Interface()
-
-	if reflect.ValueOf(w.nCopyed).IsValid() {
-		w.oCopyed = w.nCopyed
-	} else {
-		w.oCopyed = i
-	}
-
+	w.oCopyed = w.nCopyed
+	// w.c must be ptr type
+	i := reflect.Indirect(reflect.ValueOf(w.c)).Interface()
 	w.nCopyL.Lock()
 	w.nCopyed = i
 	w.nCopyL.Unlock()
