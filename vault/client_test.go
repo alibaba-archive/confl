@@ -1,7 +1,6 @@
 package vault
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -16,189 +15,157 @@ func TestVault(t *testing.T) {
 	ln, addr := http.TestServer(t, core)
 	defer ln.Close()
 
-	t.Run("init", func(t *testing.T) {
+	authType := "token"
+	t.Run("New", func(t *testing.T) {
 		assert := assert.New(t)
-		// init twice
 		changeCh := make(chan struct{})
-		cfg := &Config{
-			AuthType: Token,
+
+		// no change channel
+		cfg := Config{
+			AuthType: authType,
 			Token:    token,
 			Address:  addr,
 		}
-		err := Init(cfg, changeCh)
-		err = Init(cfg, changeCh)
+		_, err := New(cfg, nil)
 		assert.NotNil(err)
 
 		// no auth type
-		defaultClient = nil
-		changeCh = make(chan struct{})
-		cfg = &Config{
+		cfg = Config{
 			Token:   token,
 			Address: addr,
 		}
-		err = Init(cfg, changeCh)
-		assert.NotNil(err)
-
-		// no change channel
-		defaultClient = nil
-		cfg = &Config{
-			AuthType: Token,
-			Token:    token,
-			Address:  addr,
-		}
-		err = Init(cfg, nil)
+		_, err = New(cfg, changeCh)
 		assert.NotNil(err)
 
 		// error secure transport
-		defaultClient = nil
-		cfg = &Config{
-			AuthType: Token,
+		cfg = Config{
+			AuthType: authType,
 			Token:    token,
 			Address:  addr,
 			CAcert:   "/path/to/noting",
 		}
-		err = Init(cfg, changeCh)
+		_, err = New(cfg, changeCh)
 		assert.NotNil(err)
 
 		// error vault address
-		defaultClient = nil
-		changeCh = make(chan struct{})
-		cfg = &Config{
-			AuthType: Token,
+		cfg = Config{
+			AuthType: authType,
 			Token:    token,
 			Address:  "xxxxxx",
 		}
-		err = Init(cfg, changeCh)
+		_, err = New(cfg, changeCh)
 		assert.NotNil(err)
 
 		// unknown auth type
-		defaultClient = nil
-		cfg = &Config{
-			AuthType: AuthType("hello"),
+		cfg = Config{
+			AuthType: "hello",
 			Address:  addr,
 		}
-		err = Init(cfg, changeCh)
+		_, err = New(cfg, changeCh)
 		assert.NotNil(err)
 
 		// auth error
-		defaultClient = nil
-		cfg = &Config{
-			AuthType: Token,
+		cfg = Config{
+			AuthType: authType,
 			Token:    "error token",
 			Address:  addr,
 		}
-		err = Init(cfg, changeCh)
+		_, err = New(cfg, changeCh)
 		assert.NotNil(err)
 
 		// interval test success
-		defaultClient = nil
-		cfg = &Config{
-			AuthType: Token,
+		cfg = Config{
+			AuthType: authType,
 			Token:    token,
 			Address:  addr,
 			Interval: "10s",
 		}
-		err = Init(cfg, changeCh)
-		assert.Equal(10*time.Second, defaultClient.interval)
+		cl, err := New(cfg, changeCh)
+		assert.Equal(10*time.Second, cl.interval)
 
 		// interval test fail
-		defaultClient = nil
-		cfg = &Config{
-			AuthType: Token,
+		cfg = Config{
+			AuthType: authType,
 			Token:    token,
 			Address:  addr,
 			Interval: "10x",
 		}
-		err = Init(cfg, changeCh)
+		_, err = New(cfg, changeCh)
 		assert.NotNil(err)
 	})
 
-	t.Run("defaultClient", func(t *testing.T) {
+	t.Run("methods", func(t *testing.T) {
 		assert := assert.New(t)
 		require := require.New(t)
 		changeCh := make(chan struct{})
-		defaultClient = nil
-		cfg := &Config{
-			AuthType: Token,
+		cfg := Config{
+			AuthType: authType,
 			Token:    token,
 			Address:  addr,
 			Interval: "1s",
 		}
-		err := Init(cfg, changeCh)
+		client, err := New(cfg, changeCh)
 		require.Nil(err)
 
 		t.Run("key", func(t *testing.T) {
 			// wrong fmt key
-			_, err = defaultClient.key("unknown")
+			_, err = client.key("unknown")
 			assert.NotNil(err)
 
 			// unknown key
-			_, err = defaultClient.key("secret/unknown")
+			_, err = client.key("secret/unknown")
 			assert.NotNil(err)
 
 			// not a string
-			_, err = defaultClient.Client.Logical().Write("secret/password", map[string]interface{}{"value": 3})
+			_, err = client.Client.Logical().Write("secret/password", map[string]interface{}{"value": 3})
 			require.Nil(err)
-			_, err = defaultClient.key("secret/password")
+			_, err = client.key("secret/password")
 			assert.NotNil(err)
+
+			// success
+			_, err = client.Client.Logical().Write("secret/password", map[string]interface{}{"value": "hello"})
+			require.Nil(err)
+			value, _ := client.key("secret/password")
+			assert.Equal("hello", value)
 		})
 
 		t.Run("watch", func(t *testing.T) {
 			key := "secret/password"
-			defaultClient.addKV(key, "test1")
-			_, err = defaultClient.Client.Logical().Write(key, map[string]interface{}{"value": "test2"})
+			client.addKV(key, "test1")
+			_, err = client.Client.Logical().Write(key, map[string]interface{}{"value": "test2"})
 			require.Nil(err)
 			assert.Equal(struct{}{}, <-changeCh)
 
-			t.Run("error", func(t *testing.T) {
-				key := "secret/unknown"
-				defaultClient.addKV(key, "test1")
-
-				defaultClient.onError = func(err error) {
-					assert.NotNil(err)
-				}
-			})
+			// unknown k/v
+			client.errHandle = func(err error) {
+				assert.NotNil(err)
+			}
+			key2 := "secret/unknown"
+			client.addKV(key2, "test1")
 		})
 
-		t.Run("secret", func(t *testing.T) {
+		t.Run("scan", func(t *testing.T) {
 			type config struct {
-				Password Secret `json:"password"`
+				Password string `json:"password" vault:"secret/password"`
 			}
 
-			c := config{}
-			password := "123456"
+			key, value := "secret/password", "123456"
+			c := &config{Password: "xxxxxx"}
 
-			_, err = defaultClient.Client.Logical().Write("secret/password", map[string]interface{}{"value": password})
+			_, err = client.Client.Logical().Write(key, map[string]interface{}{"value": value})
 			require.Nil(err)
-			err = json.Unmarshal([]byte(`{"password": "VAULT(secret/password)"}`), &c)
-			require.Nil(err)
-			assert.Equal(password, c.Password.Value)
-
-			err = json.Unmarshal([]byte(`{"password": "VAULT(xxxxx/password)"}`), &c)
-			assert.NotNil(err)
-
-			err = json.Unmarshal([]byte(`{"password": "VAULT(secret/unknown)"}`), &c)
-			assert.NotNil(err)
+			// scan strcut for vault tag
+			err = client.Scan(c)
+			assert.Nil(err)
+			assert.Equal(value, c.Password)
 		})
 
 		t.Run("close", func(t *testing.T) {
-			Close()
+			client.Close()
 			assert.Panics(func() {
-				close(defaultClient.stopCh)
+				close(client.stopCh)
 			})
 		})
 
 	})
-}
-
-func TestUninit(t *testing.T) {
-	defaultClient = nil
-	assert := assert.New(t)
-	type config struct {
-		Password *Secret `json:"password"`
-	}
-
-	c := config{}
-	err := json.Unmarshal([]byte(`{"password": "VAULT(secret/password)"}`), &c)
-	assert.NotNil(err)
 }

@@ -1,11 +1,17 @@
 package etcd
 
-// Config etcd clusters's configuration
+// Config etcd configuration
 type Config struct {
-	Clusters []string `envconfig:"CONFL_ETCD_CLUSTERS" required:"true"`
-	Cert     string   `envconfig:"CONFL_ETCD_CERT"`
-	Key      string   `envconfig:"CONFL_ETCD_KEY"`
-	CAcert   string   `envconfig:"CONFL_ETCD_CACERT"`
-	Username string   `envconfig:"CONFL_ETCD_USERNAME"`
-	Password string   `envconfig:"CONFL_ETCD_PASSWORD"`
+	// cluseter addresses
+	Clusters []string
+	// security connection
+	// the path of certificate file
+	Cert string
+	// the path of certificate'key file
+	Key string
+	// the path of CACert file
+	CAcert string
+	// auth user/pass
+	Username string
+	Password string
 }

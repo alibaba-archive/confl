@@ -11,34 +11,27 @@ import (
 )
 
 var (
-	defaultClient   *client
 	defaultInterval = 5 * time.Minute
 )
 
-type client struct {
+type Client struct {
 	*vaultapi.Client
-	c      *Config
 	mu     sync.RWMutex
 	kvs    map[string]string
 	stopCh chan struct{}
 	//  watch interval
-	interval time.Duration
-	onError  func(err error)
-	changeCh chan struct{}
+	interval  time.Duration
+	changeCh  chan struct{}
+	errHandle func(err error)
 }
 
-// Init initialize the vault defaultClient for r/w sercrets
-func Init(cfg *Config, changeCh chan struct{}, optOnError ...func(err error)) error {
-	if defaultClient != nil {
-		return errors.New("default client already exists")
-	}
-
+func New(cfg Config, changeCh chan struct{}, errHandle ...func(err error)) (*Client, error) {
 	if changeCh == nil {
-		return errors.New("need change channel for watch changes")
+		return nil, errors.New("need change channel for watch changes")
 	}
 
-	if cfg.AuthType == None {
-		return errors.New("you have to set the auth type when using the vault backend")
+	if cfg.AuthType == "" {
+		return nil, errors.New("you have to set the auth type when using the vault backend")
 	}
 
 	var (
@@ -48,7 +41,7 @@ func Init(cfg *Config, changeCh chan struct{}, optOnError ...func(err error)) er
 
 	if cfg.Interval != "" {
 		if interval, err = time.ParseDuration(cfg.Interval); err != nil {
-			return err
+			return nil, err
 		}
 	} else {
 		interval = defaultInterval
@@ -58,19 +51,19 @@ func Init(cfg *Config, changeCh chan struct{}, optOnError ...func(err error)) er
 	vcfg.Address = cfg.Address
 	vcfg.HttpClient.Transport, err = util.SecureTransport(cfg.CAcert, cfg.Cert, cfg.Key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	cl, err := vaultapi.NewClient(vcfg)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// auth type
 	var secret *vaultapi.Secret
 
 	// check the auth type and authenticate the vault service
-	switch cfg.AuthType {
+	switch AuthType(cfg.AuthType) {
 	case AppID:
 		secret, err = cl.Logical().Write("/auth/app-id/login", map[string]interface{}{
 			"app_id":  cfg.AppID,
@@ -88,36 +81,35 @@ func Init(cfg *Config, changeCh chan struct{}, optOnError ...func(err error)) er
 			"password": cfg.Password,
 		})
 	default:
-		return fmt.Errorf("unsupported auth type(%s)", cfg.AuthType)
+		return nil, fmt.Errorf("unsupported auth type(%s)", cfg.AuthType)
 	}
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if cl.Token() == "" {
 		cl.SetToken(secret.Auth.ClientToken)
 	}
 
-	defaultClient = &client{
+	c := &Client{
 		Client:   cl,
-		c:        cfg,
 		kvs:      map[string]string{},
 		stopCh:   make(chan struct{}),
 		interval: interval,
 		changeCh: changeCh,
 	}
 
-	if len(optOnError) == 1 {
-		defaultClient.onError = optOnError[0]
+	if len(errHandle) == 1 {
+		c.errHandle = errHandle[0]
 	}
-	go defaultClient.watch()
-	return nil
+	go c.watch()
+	return c, nil
 }
 
 // addKV when config struct contains *vault.Secret type
 // then add it's Key and Value to kvs for watch
-func (c *client) addKV(key, value string) {
+func (c *Client) addKV(key, value string) {
 	c.mu.Lock()
 	c.kvs[key] = value
 	c.mu.Unlock()
@@ -125,7 +117,7 @@ func (c *client) addKV(key, value string) {
 
 // key get the value by given key
 // value only support string type
-func (c *client) key(key string) (string, error) {
+func (c *Client) key(key string) (string, error) {
 	resp, err := c.Logical().Read(key)
 	if err != nil {
 		return "", err
@@ -146,7 +138,7 @@ func (c *client) key(key string) (string, error) {
 
 // watch the key changes from kvs
 // it is triggered every c.c.Interval
-func (c *client) watch() {
+func (c *Client) watch() {
 	t := time.Tick(c.interval)
 	for {
 		select {
@@ -157,8 +149,8 @@ func (c *client) watch() {
 			for key, value := range c.kvs {
 				v, err := c.key(key)
 				if err != nil {
-					if c.onError != nil {
-						c.onError(err)
+					if c.errHandle != nil {
+						c.errHandle(err)
 					}
 					continue
 				}
@@ -172,15 +164,7 @@ func (c *client) watch() {
 	}
 }
 
-func (c *client) close() error {
+func (c *Client) Close() error {
 	close(c.stopCh)
-	return nil
-}
-
-// Close close the defaultClient
-func Close() error {
-	if defaultClient != nil {
-		return defaultClient.close()
-	}
 	return nil
 }

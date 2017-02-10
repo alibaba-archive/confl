@@ -9,15 +9,14 @@ import (
 )
 
 type Client struct {
-	c       *Config
-	client  client.KeysAPI
-	ctx     context.Context
-	cancel  context.CancelFunc
-	onError func(err error)
+	client    client.KeysAPI
+	ctx       context.Context
+	cancel    context.CancelFunc
+	errHandle func(err error)
 }
 
 // NewClient return a *etcd.Client perhaps need auth or tls
-func NewClient(cfg *Config, optOnError ...func(err error)) (*Client, error) {
+func NewClient(cfg Config, errHandle ...func(err error)) (*Client, error) {
 	var (
 		c    client.Client
 		kapi client.KeysAPI
@@ -48,14 +47,13 @@ func NewClient(cfg *Config, optOnError ...func(err error)) (*Client, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ec := &Client{
-		c:      cfg,
 		client: kapi,
 		ctx:    ctx,
 		cancel: cancel,
 	}
 
-	if len(optOnError) == 1 {
-		ec.onError = optOnError[0]
+	if len(errHandle) == 1 {
+		ec.errHandle = errHandle[0]
 	}
 	return ec, nil
 }
@@ -68,8 +66,8 @@ func (c *Client) WatchKey(key string, changeCh chan<- struct{}) {
 		watcher := c.client.Watcher(key, &client.WatcherOptions{Recursive: false, AfterIndex: 0})
 		_, err := watcher.Next(c.ctx)
 		if err != nil {
-			if c.onError != nil {
-				c.onError(err)
+			if c.errHandle != nil {
+				c.errHandle(err)
 			}
 			if c.ctx.Err() != nil {
 				// means context has be canceled and stop watch

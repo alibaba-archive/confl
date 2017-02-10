@@ -13,22 +13,33 @@ const (
 // use https://github.com/kelseyhightower/envconfig to parse the environment variables for config
 // it's container-friendly like docker, rocket
 type Config struct {
-	AuthType AuthType `envconfig:"CONFL_VAULT_AUTH_TYPE" required:"true"`
-	Address  string   `envconfig:"CONFL_VAULT_ADDRESS" required:"true"`
+	// type of auth one in (app-id, token, github, userpass)
+	AuthType string
+	// vault service address
+	Address string
+	// AuthType = app-id
 	// "app id auth backend"(See https://www.vaultproject.io/docs/auth/app-id.html)
-	AppID  string `envconfig:"CONFL_VAULT_APP_ID"`
-	UserID string `envconfig:"CONFL_VAULT_USER_ID"`
+	// this is more useful for micro services
+	// every micro service can be given a app_id to distinguish between identities
+	AppID  string
+	UserID string
+	// AuthType = userpass
 	// "userpass auth backend"(see https://www.vaultproject.io/docs/auth/userpass.html)
-	Username string `envconfig:"CONFL_VAULT_USERNAME"`
-	Password string `envconfig:"CONFL_VAULT_PASSWORD"`
-	// (See https://www.vaultproject.io/docs/auth/token.html)
-	Token string `envconfig:"CONFL_VAULT_TOKEN"`
-	// x509 key pairs
-	Cert string `envconfig:"CONFL_VAULT_CERT"`
-	Key  string `envconfig:"CONFL_VAULT_KEY"`
-	// CAcert pem
-	CAcert string `envconfig:"CONFL_VAULT_CACERT"`
-	// watch interval
-	// env vaule like `10s` `1m` `1h`
-	Interval string `envconfig:"CONFL_VAULT_INTERVAL"`
+	Username string
+	Password string
+	// AuthType = token or github
+	// auth token (See https://www.vaultproject.io/docs/auth/token.html)
+	Token string
+
+	// security connection
+	// Cert and Key are the pair of x509
+	// the path of certificate file
+	Cert string
+	// the path of certificate'key file
+	Key string
+	// the path of CACert file
+	CAcert string
+	// loop interval
+	// vaule likes `10s` `1m` `1h`
+	Interval string
 }
