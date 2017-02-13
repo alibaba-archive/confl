@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/teambition/confl"
 	"github.com/teambition/confl/examples/common"
@@ -11,7 +10,7 @@ import (
 // How it work?
 //
 // First:
-// write `{"username": "username"}` to etcd's key /confl/test
+// write `{"username": "username", "in": {"addr": "localhost"}}` to etcd's key /confl/test
 // cli: etcdctl set /confl/test '{"username": "username"}'
 //
 // Second:
@@ -19,9 +18,11 @@ import (
 // cli: vault write secret/password value=123456
 // write `123456` to vault's key secret/token
 // cli: vault write secret/token value=123456
+// write `123456` to vault's key secret/token
+// cli: vault write secret/in/pass value=123456
 //
 // Then:
-// watcher will get {"username": "username", "password": "123456", token:"123456"}
+// watcher will get {"username": "username", "password": "123456", token:"123456", "in": {"addr": "localhost", "pass": "123456"}}
 
 func main() {
 	watcher, err := confl.NewStoreWatcher(&common.Config{}, "/confl/test", confl.Options{
@@ -54,23 +55,15 @@ func main() {
 		ocfg := oc.(common.Config)
 		ncfg := nc.(common.Config)
 		// use cfg
-		fmt.Printf("change old username: %s\n", ocfg.Username)
-		fmt.Printf("change old password: %s\n", ocfg.Password)
-		fmt.Printf("change old token: %s\n", ocfg.Token)
-		fmt.Printf("change new username: %s\n", ncfg.Username)
-		fmt.Printf("change new password: %s\n", ncfg.Password)
-		fmt.Printf("change new token: %s\n", ncfg.Token)
+		fmt.Printf("old config: %#v\n", ocfg)
+		fmt.Printf("new config: %#v\n", ncfg)
 	})
-
-	// start watch
-	// it is a blocking method
-	go watcher.Watch()
 
 	// get configuration from watcher
 	cfg := watcher.Config().(common.Config)
 	// use cfg
-	fmt.Printf("load username: %s\n", cfg.Username)
-	fmt.Printf("load password: %s\n", cfg.Password)
-	fmt.Printf("load password: %s\n", cfg.Token)
-	time.Sleep(time.Hour)
+	fmt.Printf("load config: %#v\n", cfg)
+	// start watch
+	// it is a blocking method choose run with `go` by situation
+	watcher.Watch()
 }

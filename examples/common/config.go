@@ -6,6 +6,12 @@ type Config struct {
 	Username string `json:"username"`
 	// tag vault:"secret" is a secure type for store password, secret, token etc
 	// it will load value from vault which is a tool for managing secrets
-	Password string `json:"password" vault:"secret/password"`
-	Token    string `json:"token" vault:"secret/token"`
+	Password string   `json:"password" vault:"secret/password"`
+	Token    string   `json:"token" vault:"secret/token"`
+	In       ConfigIn `json:"in"`
+}
+
+type ConfigIn struct {
+	Addr string `json:"addr"`
+	Pass string `json:"pass" vault:"secret/in/pass"`
 }

@@ -16,41 +16,38 @@ func (c *Client) Scan(v interface{}) error {
 	if rv.Kind() != reflect.Ptr || rv.IsNil() || rv.Elem().Kind() != reflect.Struct {
 		return errors.New("need a struct pointer")
 	}
-	return c.scan(rv)
+	return c.scanStruct(rv.Elem())
 }
 
-var ErrStringType = errors.New("elem must be string type with `vault` tag")
-
-// scan iter the struct for look tag `vault`
-func (c *Client) scan(rv reflect.Value) error {
-	switch rv.Kind() {
-	case reflect.Ptr:
-		return c.scan(rv.Elem())
-	case reflect.Struct:
-		for f, fs := 0, rv.NumField(); f < fs; f++ {
-			val := rv.Field(f)
+// scanStruct iter the struct for lookup tag `vault`
+func (c *Client) scanStruct(rv reflect.Value) (err error) {
+	for f, fs := 0, rv.NumField(); f < fs; f++ {
+		val := rv.Field(f)
+		switch val.Kind() {
+		case reflect.String:
+			// vault tag only appeared in string type
 			vaultKey := rv.Type().Field(f).Tag.Get(vaultTag)
 			if vaultKey != "" {
-				if val.Kind() == reflect.String {
-					result, err := c.key(vaultKey)
-					if err != nil {
-						return err
-					}
-					c.addKV(vaultKey, result)
-					val.SetString(result)
-				} else {
-					return ErrStringType
+				result := ""
+				result, err = c.key(vaultKey)
+				if err != nil {
+					return
 				}
-			} else {
-				if (val.Kind() == reflect.Ptr && val.Elem().Kind() == reflect.Struct) || val.Kind() == reflect.Struct {
-					if err := c.scan(val); err != nil {
-						return err
-					}
+				c.addKV(vaultKey, result)
+				val.SetString(result)
+			}
+		case reflect.Ptr:
+			e := val.Elem()
+			if e.Kind() == reflect.Struct {
+				if err = c.scanStruct(e); err != nil {
+					return
 				}
 			}
+		case reflect.Struct:
+			if err = c.scanStruct(val); err != nil {
+				return
+			}
 		}
-		return nil
-	default:
-		return errors.New("only support struct type")
 	}
+	return nil
 }
