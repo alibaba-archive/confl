@@ -23,7 +23,7 @@ type fileWatcher struct {
 }
 
 // NewFileWatcher new a Watcher for file system
-func NewFileWatcher(c interface{}, confPath string) (Watcher, error) {
+func NewFileWatcher(c interface{}, confPath string) (*fileWatcher, error) {
 	f := &fileWatcher{
 		confPath:  confPath,
 		c:         c,

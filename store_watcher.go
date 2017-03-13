@@ -40,7 +40,7 @@ type (
 )
 
 // NewStoreWatcher new a Watcher for backend storages
-func NewStoreWatcher(c interface{}, confPath string, opts Options) (Watcher, error) {
+func NewStoreWatcher(c interface{}, confPath string, opts Options) (*storeWatcher, error) {
 	s := &storeWatcher{
 		c:         c,
 		confPath:  confPath,
