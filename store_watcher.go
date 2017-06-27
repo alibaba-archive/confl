@@ -104,19 +104,20 @@ func (s *storeWatcher) loadConfig() error {
 		return err
 	}
 
+	sc := reflect.New(reflect.TypeOf(s.c).Elem()).Interface()
 	// now configuration only support json type
-	if err = json.Unmarshal([]byte(v), s.c); err != nil {
+	if err = json.Unmarshal([]byte(v), sc); err != nil {
 		return err
 	}
 
 	// scan the struct and replace the key to value from vault
-	if err = s.vault.Scan(s.c); err != nil {
+	if err = s.vault.Scan(sc); err != nil {
 		return err
 	}
 
 	s.oCopyed = s.nCopyed
 	// s.c must be ptr type
-	i := reflect.Indirect(reflect.ValueOf(s.c)).Interface()
+	i := reflect.Indirect(reflect.ValueOf(sc)).Interface()
 	s.nCopyL.Lock()
 	s.nCopyed = i
 	s.nCopyL.Unlock()

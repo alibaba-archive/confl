@@ -36,7 +36,7 @@ func NewFileWatcher(c interface{}, confPath string) (*fileWatcher, error) {
 		return nil, err
 	}
 
-	if err = f.w.WatchFlags(confPath, fsnotify.FSN_MODIFY); err != nil {
+	if err = f.w.WatchFlags(confPath, fsnotify.FSN_ALL); err != nil {
 		return nil, err
 	}
 
@@ -51,15 +51,15 @@ func (f *fileWatcher) loadConfig() error {
 	if err != nil {
 		return err
 	}
-
-	if err = json.Unmarshal(fileData, f.c); err != nil {
+	fc:=reflect.New(reflect.TypeOf(f.c).Elem()).Interface()
+	if err = json.Unmarshal(fileData, fc); err != nil {
 		return err
 	}
 
 	f.oCopyed = f.nCopyed
 
 	// w.c must be ptr type
-	i := reflect.Indirect(reflect.ValueOf(f.c)).Interface()
+	i := reflect.Indirect(reflect.ValueOf(fc)).Interface()
 	f.nCopyL.Lock()
 	f.nCopyed = i
 	f.nCopyL.Unlock()
