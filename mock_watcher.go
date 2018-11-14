@@ -1,6 +1,7 @@
 package confl
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"sync"
@@ -8,24 +9,27 @@ import (
 
 // mockWatcher watcher for test
 type mockWatcher struct {
-	c       interface{}
-	oCopyed interface{}
-	nCopyL  sync.RWMutex
-	nCopyed interface{}
-	hookL   sync.Mutex
-	hooks   []Hook
-	change  chan struct{}
+	c         interface{}
+	oCopyed   interface{}
+	nCopyL    sync.RWMutex
+	nCopyed   interface{}
+	hookL     sync.Mutex
+	hooks     []Hook
+	change    chan struct{}
+	unmarshal (func([]byte, interface{}) error)
 }
 
 // NewMockWatcher new watcher with pointer of config stucture
-func NewMockWatcher(c interface{}) (*mockWatcher, error) {
+func NewMockWatcher(c interface{}) (Watcher, error) {
 	if reflect.ValueOf(c).IsNil() {
 		return nil, errors.New("need none nil config structure")
 	}
 	return &mockWatcher{
-		c:      c,
-		hooks:  []Hook{},
-		change: make(chan struct{}),
+		c:         c,
+		nCopyed:   reflect.Indirect(reflect.ValueOf(c)).Interface(),
+		hooks:     []Hook{},
+		change:    make(chan struct{}),
+		unmarshal: json.Unmarshal,
 	}, nil
 }
 

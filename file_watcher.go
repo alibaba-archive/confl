@@ -6,8 +6,11 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/howeyc/fsnotify"
+	"github.com/fsnotify/fsnotify"
 )
+
+// Unmarshal - unmarshal function for FileWatcher
+type Unmarshal func([]byte, interface{}) error
 
 // fileWatcher watch the changes of configuration file
 type fileWatcher struct {
@@ -20,15 +23,22 @@ type fileWatcher struct {
 	hookL     sync.Mutex
 	hooks     []Hook
 	errHandle func(error)
+	unmarshal Unmarshal
 }
 
-// NewFileWatcher new a Watcher for file system
-func NewFileWatcher(c interface{}, confPath string) (*fileWatcher, error) {
+// NewFileWatcher returns new a Watcher for file system
+func NewFileWatcher(c interface{}, confPath string, fns ...Unmarshal) (Watcher, error) {
+	unmarshal := json.Unmarshal
+	if len(fns) > 0 {
+		unmarshal = fns[0]
+	}
+
 	f := &fileWatcher{
 		confPath:  confPath,
 		c:         c,
 		hooks:     []Hook{},
 		errHandle: defautlOnError,
+		unmarshal: unmarshal,
 	}
 
 	var err error
@@ -36,7 +46,7 @@ func NewFileWatcher(c interface{}, confPath string) (*fileWatcher, error) {
 		return nil, err
 	}
 
-	if err = f.w.WatchFlags(confPath, fsnotify.FSN_ALL); err != nil {
+	if err = f.w.Add(confPath); err != nil {
 		return nil, err
 	}
 
@@ -51,8 +61,8 @@ func (f *fileWatcher) loadConfig() error {
 	if err != nil {
 		return err
 	}
-	fc:=reflect.New(reflect.TypeOf(f.c).Elem()).Interface()
-	if err = json.Unmarshal(fileData, fc); err != nil {
+	fc := reflect.New(reflect.TypeOf(f.c).Elem()).Interface()
+	if err = f.unmarshal(fileData, fc); err != nil {
 		return err
 	}
 
@@ -75,8 +85,8 @@ func (f *fileWatcher) Config() interface{} {
 func (f *fileWatcher) Watch() {
 	for {
 		select {
-		case ev := <-f.w.Event:
-			if ev.IsAttrib() {
+		case ev := <-f.w.Events:
+			if ev.Op != fsnotify.Write {
 				continue
 			}
 			if err := f.loadConfig(); err != nil {
@@ -87,7 +97,7 @@ func (f *fileWatcher) Watch() {
 			for _, hook := range f.hooks {
 				hook(f.oCopyed, f.Config())
 			}
-		case err := <-f.w.Error:
+		case err := <-f.w.Errors:
 			f.errHandle(err)
 		}
 	}

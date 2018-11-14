@@ -2,6 +2,9 @@ package confl
 
 import "log"
 
+// Version -
+const Version = "1.4.0"
+
 // defautlOnError default handle for error case
 func defautlOnError(err error) {
 	if err != nil {

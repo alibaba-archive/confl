@@ -1,0 +1,6 @@
+username: username
+password: '1234'
+token: '4321'
+in:
+  addr: localhost
+  pass: '666'

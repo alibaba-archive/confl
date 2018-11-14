@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/teambition/confl"
-	"github.com/teambition/confl/examples/common"
+	"github.com/teambition/confl/examples/config"
+	"gopkg.in/yaml.v2"
 )
 
 func main() {
-	watcher, err := confl.NewFileWatcher(&common.Config{}, "../common/config.json")
+	watcher, err := confl.NewFileWatcher(&config.Config{}, "./default.yaml", yaml.Unmarshal)
 	if err != nil {
 		panic(err)
 	}
@@ -22,15 +23,15 @@ func main() {
 	// add hook for update events
 	// perhaps you need reload something that depends the configuration
 	watcher.AddHook(func(oc, nc interface{}) {
-		ocfg := oc.(common.Config)
-		ncfg := nc.(common.Config)
+		ocfg := oc.(config.Config)
+		ncfg := nc.(config.Config)
 		// use cfg
 		fmt.Printf("old config: %#v\n", ocfg)
 		fmt.Printf("new config: %#v\n", ncfg)
 	})
 
 	// get configuration from watcher
-	cfg := watcher.Config().(common.Config)
+	cfg := watcher.Config().(config.Config)
 	// use cfg
 	fmt.Printf("load config: %#v\n", cfg)
 
